@@ -150,11 +150,13 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit) {
                     .border(0.5.dp, p.hairline, shape),
             ) {
                 Segmented(Tab.entries, tab, { it.label }, p, Modifier.padding(10.dp)) { tab = it }
+                // 정리 탭이 비어 있으면 스크롤 없이 안내를 세로 가운데에 둔다
+                val empty = tab == Tab.Repos && app.pending.isEmpty() && app.discovered.isEmpty()
                 Column(
                     Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
+                        .then(if (empty) Modifier else Modifier.verticalScroll(rememberScrollState()))
                         .padding(horizontal = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
@@ -188,15 +190,6 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
         }
     }
 
-    val notice = app.problem ?: app.blockingIdes.takeIf { it.isNotEmpty() }?.let { "${it.joinToString()}을(를) 종료하면 옮겨요" }
-    notice?.let {
-        Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Warning, null, tint = p.warning, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(it, color = p.warning, fontSize = 12.sp)
-        }
-    }
-
     if (!app.loggedIn && app.deviceCode == null) {
         SectionTitle("GitHub", p)
         ItemRow(Icons.Filled.Lock, "로그인", "비공개 저장소도 함께 정리해요", p) {
@@ -209,8 +202,9 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
 
     if (app.pending.isEmpty() && app.discovered.isEmpty()) {
         Column(
-            Modifier.fillMaxWidth().padding(vertical = 28.dp),
+            Modifier.fillMaxWidth().weight(1f),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             Icon(Icons.Filled.CheckCircle, null, tint = p.tertiary, modifier = Modifier.size(40.dp))
             Spacer(Modifier.height(10.dp))
@@ -220,7 +214,7 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
     }
 
     if (app.pending.isNotEmpty() && app.runningAgents.isNotEmpty()) {
-        Notice("${app.runningAgents.joinToString()} 세션이 실행 중이에요. 옮기면 이 도구가 바뀐 경로를 예전 값으로 덮어쓸 수 있어요.", p)
+        Notice("${app.runningAgents.joinToString()} 실행 중 · 바뀐 경로가 덮어써질 수 있어요", p)
     }
 
     if (app.pending.isNotEmpty()) {
@@ -284,6 +278,7 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
     var interval by remember { mutableStateOf(Settings.intervalMinutes) }
     var loginItem by remember { mutableStateOf(LoginItem.enabled) }
     var devTools by remember { mutableStateOf(Settings.devTools) }
+    var agentTools by remember { mutableStateOf(Settings.agentTools) }
     var discover by remember { mutableStateOf(Settings.discover) }
     var showNotices by remember { mutableStateOf(false) }
 
@@ -323,19 +318,22 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
 
     SectionTitle("동작", p)
     Group(p) {
-        SettingRow("자동으로 옮기기", p, info = "켜면 옮길 저장소를 찾는 즉시 옮겨요. 끄면 정리 탭에서 승인한 저장소만 옮겨요.") {
+        SettingRow("자동으로 옮기기", p, info = "끄면 승인한 저장소만 옮겨요.") {
             MacSwitch(app.autoMove, p, onChange = app::updateAutoMove)
         }
         Hairline(p)
-        SettingRow(
-            "개발 도구 연동",
-            p,
-            info = DEV_TOOLS_INFO,
-        ) {
+        SettingRow("IDE·ADE 연동", p, info = IDE_INFO) {
             MacSwitch(devTools, p) {
                 devTools = it
                 Settings.devTools = it
                 app.scanNow()
+            }
+        }
+        Hairline(p)
+        SettingRow("에이전트 도구 연동", p, info = AGENT_INFO) {
+            MacSwitch(agentTools, p) {
+                agentTools = it
+                Settings.agentTools = it
             }
         }
         Hairline(p)
@@ -353,15 +351,6 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
                 loginItem = LoginItem.enabled
             }
         }
-    }
-
-    if (devTools) {
-        Text(
-            "Claude Code·Codex 같은 에이전트 세션이 실행 중일 때 옮기면, 그 도구가 바뀐 경로를 예전 값으로 덮어쓸 수 있어요.",
-            color = p.warning,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
     }
 
     SectionTitle("GitHub", p)
@@ -413,14 +402,15 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
     }
 }
 
-private const val DISCOVER_INFO =
-    "루트 밖 홈 폴더 전체를 천천히 훑어 GitHub 저장소를 찾아요. 찾은 저장소는 '가져오기'를 눌러야 옮겨요. " +
-        "숨김 폴더와 ~/Library는 건너뛰어요."
+private const val DISCOVER_INFO = "루트 밖 홈 폴더에서 저장소를 찾아요. 승인해야 가져와요. 숨김 폴더와 ~/Library는 빼요."
 
-private const val DEV_TOOLS_INFO =
-    "JetBrains IDE, Android Studio, VS Code·Cursor·Windsurf·Antigravity, Orca, Paseo, herdr, Air가 " +
-        "켜져 있으면 끌 때까지 기다렸다가 옮겨요. " +
-        "옮긴 뒤에는 이 도구들과 Claude Code, Codex, Copilot, Gemini, Hermes가 기억하는 프로젝트 경로도 바꿔요."
+private const val IDE_INFO =
+    "JetBrains IDE, Android Studio, VS Code, Cursor, Windsurf, Antigravity, Orca, Paseo, herdr, Air가 켜져 있으면 " +
+        "기다렸다가 옮기고, 이 도구들의 프로젝트 경로를 바꿔요."
+
+private const val AGENT_INFO =
+    "Claude Code, Codex, Copilot, Gemini, Hermes의 프로젝트 경로를 바꿔요. " +
+        "세션이 실행 중이면 바뀐 경로를 도구가 덮어쓸 수 있어요."
 
 private fun homeRelative(path: Path) = path.toString().replaceFirst(System.getProperty("user.home"), "~")
 
@@ -492,9 +482,20 @@ private fun Footer(app: DevStruct, p: Palette, tab: Tab, onQuit: () -> Unit) {
         Modifier.fillMaxWidth().background(p.footer).padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 상태는 한 번만: 확인 중이면 도는 아이콘만, 문제가 있으면 그 문제만 보여준다
+        val problem = app.problem
         when {
             tab == Tab.Settings -> Text("DevStruct $APP_VERSION", color = p.secondary, fontSize = 12.sp)
-            app.scanning -> Text("확인하는 중…", color = p.secondary, fontSize = 12.sp)
+            problem != null ->
+                Text(
+                    problem,
+                    color = p.warning,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            app.scanning -> Unit
             else -> {
                 val minutes = ((app.nextScanAt - now) / 60_000).coerceAtLeast(0)
                 Text(if (minutes < 1) "곧 다시 확인해요" else "${minutes}분 후 다시 확인", color = p.secondary, fontSize = 12.sp)
@@ -648,8 +649,8 @@ private fun WaitingLabel(app: DevStruct, plan: RepoPlan, p: Palette) {
         when {
             app.blockingIdes.isNotEmpty() ->
                 "도구 종료 후" to
-                    "${app.blockingIdes.joinToString()}이(가) 켜져 있어 기다리고 있어요. 종료하면 바로 옮겨요."
-            plan.dir in app.busyRepos -> "사용 중" to "터미널이나 에이전트가 이 폴더에서 실행 중이에요. 끝나면 옮겨요."
+                    "${app.blockingIdes.joinToString()}을(를) 끄면 옮겨요."
+            plan.dir in app.busyRepos -> "사용 중" to "터미널이나 에이전트가 이 폴더를 쓰고 있어요."
             else -> null
         }
     if (reason == null) {
