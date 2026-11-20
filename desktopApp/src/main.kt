@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.awt.BasicStroke
@@ -32,6 +33,9 @@ import kotlin.system.exitProcess
 // 팝오버 크기(그림자 여백 포함)
 private const val WIDTH = 360
 private const val MAX_HEIGHT = 620
+
+// Popover 바깥의 그림자용 투명 여백
+private const val SHADOW = 10
 
 fun main(args: Array<String>) {
     if ("--dry-run" in args) dryRun()
@@ -64,6 +68,11 @@ fun main(args: Array<String>) {
                     }
                 },
             )
+            // 알림을 누르면 팝오버를 연다
+            trayIcon.addActionListener {
+                anchor = null
+                open = true
+            }
             SystemTray.getSystemTray().add(trayIcon)
             onDispose { SystemTray.getSystemTray().remove(trayIcon) }
         }
@@ -92,7 +101,9 @@ fun main(args: Array<String>) {
             }
             LaunchedEffect(open, anchor) {
                 if (!open) return@LaunchedEffect
-                window.location = popoverLocation(anchor)
+                // AWT로 직접 옮기면 창이 뜰 때 Compose가 기본 위치로 덮어쓴다
+                val location = popoverLocation(trayIconLocation(trayIcon), anchor)
+                windowState.position = WindowPosition(location.x.dp, location.y.dp)
                 window.toFront()
                 window.requestFocus()
             }
@@ -104,14 +115,21 @@ fun main(args: Array<String>) {
     }
 }
 
-/** 메뉴바 아이콘 바로 아래, 화면 안쪽에 맞춘다. 아이콘 위치를 모르면 오른쪽 위. */
-private fun popoverLocation(anchor: Point?): Point {
+/**
+ * 팝오버 본문의 왼쪽 위 모서리를 메뉴바 아이콘의 왼쪽 끝 바로 아래에 맞춘다(화면 밖으로 나가면 안쪽으로 민다).
+ * 아이콘 위치를 못 구하면 클릭 지점을, 그것도 없으면 화면 오른쪽 위를 쓴다.
+ */
+private fun popoverLocation(icon: Point?, click: Point?): Point {
+    val reference = icon ?: click
     val screens = GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices.map { it.defaultConfiguration }
-    val screen = screens.firstOrNull { anchor != null && it.bounds.contains(anchor) } ?: screens.first()
+    val screen =
+        screens.firstOrNull { reference != null && it.bounds.contains(reference.x, it.bounds.y) } ?: screens.first()
     val bounds = screen.bounds
-    val top = bounds.y + Toolkit.getDefaultToolkit().getScreenInsets(screen).top
-    val centerX = anchor?.x ?: (bounds.x + bounds.width - WIDTH / 2 - 8)
-    return Point((centerX - WIDTH / 2).coerceIn(bounds.x, bounds.x + bounds.width - WIDTH), top)
+    val menuBarBottom = bounds.y + Toolkit.getDefaultToolkit().getScreenInsets(screen).top
+    val contentWidth = WIDTH - 2 * SHADOW
+    val left = icon?.x ?: click?.let { it.x - 12 } ?: (bounds.x + bounds.width - contentWidth - 8)
+    val contentLeft = left.coerceIn(bounds.x + 6, bounds.x + bounds.width - contentWidth - 6)
+    return Point(contentLeft - SHADOW, menuBarBottom - SHADOW)
 }
 
 /** 템플릿 이미지(알파만 사용)로 그린 폴더 모양 */
@@ -131,7 +149,7 @@ private fun trayImage(): BufferedImage {
 /** 아무것도 바꾸지 않고 계획만 출력한다. */
 private fun dryRun(): Nothing {
     val root = Path.of(Settings.root)
-    val plans = Organizer(root, ::println).scan()
+    val plans = Organizer(root, ::println).scan().plans
     plans.filter { it.newRemote != null }.forEach { println("remote: ${root.relativize(it.dir)} → ${it.newRemote}") }
     plans.filter {
         it.needsMove

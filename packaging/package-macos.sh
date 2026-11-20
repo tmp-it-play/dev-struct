@@ -16,6 +16,8 @@ cp build/tasks/_desktopApp_executableJarJvm/desktopApp-jvm-executable.jar dist/i
     --icon packaging/AppIcon.icns \
     --mac-package-identifier team.themoment.devstruct \
     --java-options --enable-native-access=ALL-UNNAMED \
+    --java-options --add-opens=java.desktop/java.awt=ALL-UNNAMED \
+    --java-options --add-opens=java.desktop/sun.lwawt.macosx=ALL-UNNAMED \
     --dest dist
 # 메뉴바 앱이라 Dock 아이콘을 숨긴다
 plutil -insert LSUIElement -bool true dist/DevStruct.app/Contents/Info.plist
