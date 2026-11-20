@@ -1,0 +1,2 @@
+- Do not write or run tests. Do not add test files, test dependencies, or test steps to CI.
+- Write final reports in clear language inspired by ASD-STE100, with detail appropriate to the task.
