@@ -31,7 +31,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
@@ -56,7 +55,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
@@ -339,7 +341,7 @@ private fun Footer(app: DevStruct, p: Palette, tab: Tab, onQuit: () -> Unit) {
             if (!app.scanning) app.scanNow()
         }
         Spacer(Modifier.width(6.dp))
-        CircleButton(Icons.Filled.ExitToApp, "종료", p, onClick = onQuit)
+        CircleButton(PowerIcon, "종료", p, onClick = onQuit)
     }
 }
 
@@ -471,6 +473,23 @@ private fun CircleButton(
         Icon(icon, description, tint = p.secondary, modifier = iconModifier.size(15.dp))
     }
 }
+
+/** macOS 종료 버튼에 쓰는 전원(⏻) 모양 */
+private val PowerIcon: ImageVector =
+    ImageVector
+        .Builder("Power", 24.dp, 24.dp, 24f, 24f)
+        .path(
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 2.2f,
+            strokeLineCap = StrokeCap.Round,
+        ) {
+            // 위가 트인 원
+            moveTo(7.05f, 6.5f)
+            arcTo(7.5f, 7.5f, 0f, isMoreThanHalf = true, isPositiveArc = false, x1 = 16.95f, y1 = 6.5f)
+            // 세로 막대
+            moveTo(12f, 3.5f)
+            lineTo(12f, 11.5f)
+        }.build()
 
 /** macOS처럼 누를 때 물결·강조·깜빡임이 없다 */
 @Composable
