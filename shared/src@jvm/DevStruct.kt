@@ -53,7 +53,9 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String, 
         private set
     var update by mutableStateOf<Release?>(null)
         private set
-    var loggedIn by mutableStateOf(GitHubAuth.token() != null)
+    private var accountToken by mutableStateOf(GitHubAuth.token())
+    val loggedIn get() = accountToken != null
+    var githubUsername by mutableStateOf<String?>(null)
         private set
     var deviceCode by mutableStateOf<DeviceCode?>(null)
         private set
@@ -213,7 +215,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String, 
             runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(code.verificationUri)) }
             val error = withContext(Dispatchers.IO) { GitHubAuth.awaitToken(code) }
             deviceCode = null
-            loggedIn = GitHubAuth.token() != null
+            syncAccount()
             error?.let(::log)
             if (loggedIn) {
                 notify("GitHub에 로그인했어요", Page.Repos)
@@ -224,7 +226,28 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String, 
 
     fun logout() {
         GitHubAuth.logout()
-        loggedIn = false
+        syncAccount()
+    }
+
+    private fun syncAccount() {
+        val token = GitHubAuth.token()
+        if (accountToken != token) {
+            accountToken = token
+            githubUsername = null
+        }
+    }
+
+    suspend fun refreshGitHubUsername() {
+        val token = accountToken ?: return
+        val username = withContext(Dispatchers.IO) {
+            try {
+                GitHub.get("user")?.string("login")?.takeIf { it.isNotBlank() }
+            } catch (_: GitHubLimitException) {
+                null
+            }
+        }
+        syncAccount()
+        if (accountToken == token && username != null) githubUsername = username
     }
 
     fun scanNow() {
@@ -307,7 +330,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String, 
                 }
             approved = approved.filterTo(mutableSetOf()) { dir -> pending.any { it.dir == dir } }
             log("스캔 완료: 저장소 ${plans.size}개, 이동 필요 ${moves.size}개")
-            loggedIn = GitHubAuth.token() != null
+            syncAccount()
             val limitedUntil = result.limitedUntil ?: updateLimit
             problem = limitedUntil?.let(::limitMessage)
             // 한도가 풀리기 전에는 다시 확인하지 않는다

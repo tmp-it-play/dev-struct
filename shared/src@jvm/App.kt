@@ -68,9 +68,15 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -355,10 +361,39 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
 
     SectionTitle("GitHub", p)
     Group(p) {
-        SettingRow(if (app.loggedIn) "로그인됨" else "로그인 안 됨", p) {
-            if (app.loggedIn) {
+        if (app.loggedIn) {
+            LaunchedEffect(app) { app.refreshGitHubUsername() }
+            Row(
+                Modifier.fillMaxWidth().height(38.dp).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                val username = app.githubUsername
+                val label = buildAnnotatedString {
+                    if (username == null) {
+                        append("GitHub 계정")
+                    } else {
+                        val underline = SpanStyle(textDecoration = TextDecoration.Underline)
+                        val styles = TextLinkStyles(
+                            style = SpanStyle(color = p.accent, textDecoration = TextDecoration.None),
+                            hoveredStyle = underline,
+                            focusedStyle = underline,
+                        )
+                        withLink(LinkAnnotation.Url("https://github.com/$username", styles)) { append(username) }
+                    }
+                }
+                Text(
+                    label,
+                    modifier = Modifier.weight(1f),
+                    color = p.label,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Pill("로그아웃", p, onClick = app::logout)
-            } else {
+            }
+        } else {
+            SettingRow("로그인 안 됨", p) {
                 Pill("로그인", p) {
                     app.login()
                     onClose()
