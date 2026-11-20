@@ -244,7 +244,7 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Pill("고정", p, subtle = true) { app.pin(plan) }
                 if (app.autoMove || plan.dir in app.approved) {
-                    Text("대기 중", color = p.secondary, fontSize = 11.sp)
+                    WaitingLabel(app, p)
                 } else {
                     Pill("승인", p) { app.approve(plan) }
                 }
@@ -547,20 +547,7 @@ private fun SettingRow(label: String, p: Palette, info: String? = null, trailing
         info?.let {
             Spacer(Modifier.width(4.dp))
             TooltipArea(
-                tooltip = {
-                    Text(
-                        it,
-                        color = p.label,
-                        fontSize = 11.sp,
-                        modifier =
-                        Modifier
-                            .widthIn(max = 240.dp)
-                            .shadow(4.dp, RoundedCornerShape(8.dp))
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(p.window)
-                            .padding(horizontal = 10.dp, vertical = 7.dp),
-                    )
-                },
+                tooltip = { Tip(it, p) },
                 delayMillis = 300,
             ) {
                 Icon(Icons.Outlined.Info, "설명", tint = p.tertiary, modifier = Modifier.size(14.dp))
@@ -595,6 +582,42 @@ private fun Pill(label: String, p: Palette, subtle: Boolean = false, onClick: ()
             .background(if (subtle) p.segmentTrack else color.copy(alpha = 0.14f))
             .pressable(onClick)
             .padding(horizontal = 11.dp, vertical = 3.dp),
+    )
+}
+
+/** 승인했지만 아직 옮기지 않은 이유. IDE 때문이면 어떤 IDE인지 툴팁으로 알려준다 */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WaitingLabel(app: DevStruct, p: Palette) {
+    if (app.blockingIdes.isEmpty()) {
+        Text("곧 옮겨요", color = p.secondary, fontSize = 11.sp)
+        return
+    }
+    TooltipArea(
+        tooltip = { Tip("${app.blockingIdes.joinToString()}이(가) 켜져 있어 기다리고 있어요. 종료하면 바로 옮겨요.", p) },
+        delayMillis = 300,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("IDE 종료 후", color = p.warning, fontSize = 11.sp)
+            Spacer(Modifier.width(3.dp))
+            Icon(Icons.Outlined.Info, null, tint = p.warning, modifier = Modifier.size(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun Tip(text: String, p: Palette) {
+    Text(
+        text,
+        color = p.label,
+        fontSize = 11.sp,
+        modifier =
+        Modifier
+            .widthIn(max = 240.dp)
+            .shadow(4.dp, RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(8.dp))
+            .background(p.window)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
     )
 }
 
