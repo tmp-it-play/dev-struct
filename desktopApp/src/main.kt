@@ -197,6 +197,6 @@ private fun dryRun(): Nothing {
     plans.filter {
         it.needsMove
     }.forEach { println("move:   ${root.relativize(it.dir)} → ${root.relativize(it.target)}") }
-    println("저장소 ${plans.size}개, IDE 실행 중: ${JetBrains.runningIdes().ifEmpty { listOf("없음") }.joinToString()}")
+    println("저장소 ${plans.size}개, IDE 실행 중: ${DevTools.running().ifEmpty { listOf("없음") }.joinToString()}")
     exitProcess(0)
 }

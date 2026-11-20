@@ -253,7 +253,7 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
     var root by remember { mutableStateOf(Settings.root) }
     var interval by remember { mutableStateOf(Settings.intervalMinutes) }
     var loginItem by remember { mutableStateOf(LoginItem.enabled) }
-    var jetbrains by remember { mutableStateOf(Settings.jetbrains) }
+    var devTools by remember { mutableStateOf(Settings.devTools) }
     var showNotices by remember { mutableStateOf(false) }
 
     if (showNotices) {
@@ -297,13 +297,13 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
         }
         Hairline(p)
         SettingRow(
-            "JetBrains IDE 연동",
+            "개발 도구 연동",
             p,
-            info = "IntelliJ IDEA 같은 JetBrains IDE가 켜져 있으면 끌 때까지 기다렸다가 옮기고, 옮긴 뒤 IDE의 최근 프로젝트 경로도 바꿔요.",
+            info = DEV_TOOLS_INFO,
         ) {
-            MacSwitch(jetbrains, p) {
-                jetbrains = it
-                Settings.jetbrains = it
+            MacSwitch(devTools, p) {
+                devTools = it
+                Settings.devTools = it
                 app.scanNow()
             }
         }
@@ -364,6 +364,10 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
         LinkRow("오픈소스 고지", p) { showNotices = true }
     }
 }
+
+private const val DEV_TOOLS_INFO =
+    "JetBrains IDE, Android Studio, VS Code, Orca, Paseo, herdr, Air가 켜져 있으면 끌 때까지 기다렸다가 옮기고, " +
+        "옮긴 뒤 이 도구들이 기억하는 프로젝트 경로도 바꿔요."
 
 private fun intervalLabel(minutes: Int) = if (minutes < 60) "${minutes}분" else "${minutes / 60}시간"
 
@@ -594,7 +598,7 @@ private fun WaitingLabel(app: DevStruct, p: Palette) {
         delayMillis = 300,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("IDE 종료 후", color = p.warning, fontSize = 11.sp)
+            Text("도구 종료 후", color = p.warning, fontSize = 11.sp)
             Spacer(Modifier.width(3.dp))
             Icon(Icons.Outlined.Info, null, tint = p.warning, modifier = Modifier.size(12.dp))
         }

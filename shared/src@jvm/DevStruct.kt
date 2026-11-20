@@ -235,7 +235,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     private suspend fun processMoves() {
         val ready = pending.filter { autoMove || it.dir in approved }
         if (ready.isEmpty()) return
-        blockingIdes = if (Settings.jetbrains) withContext(Dispatchers.IO) { JetBrains.runningIdes() } else emptyList()
+        blockingIdes = if (Settings.devTools) withContext(Dispatchers.IO) { DevTools.running() } else emptyList()
         if (blockingIdes.isNotEmpty()) return
 
         val organizer = Organizer(Path.of(Settings.root), ::log)

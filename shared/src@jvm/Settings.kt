@@ -22,8 +22,8 @@ object Settings {
         get() = prefs.getBoolean("autoMove", false)
         set(value) = prefs.putBoolean("autoMove", value)
 
-    /** JetBrains IDE가 켜져 있으면 이동을 미루고, 옮긴 뒤 IDE의 프로젝트 경로를 바꾼다 */
-    var jetbrains: Boolean
+    /** 개발 도구가 켜져 있으면 이동을 미루고, 옮긴 뒤 도구들의 프로젝트 경로를 바꾼다(키는 예전 이름 유지) */
+    var devTools: Boolean
         get() = prefs.getBoolean("jetbrains", true)
         set(value) = prefs.putBoolean("jetbrains", value)
 }
