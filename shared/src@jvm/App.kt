@@ -1,5 +1,6 @@
 package team.themoment.dev_struct
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
@@ -853,17 +854,18 @@ private fun Modifier.pressable(onClick: () -> Unit): Modifier {
 
 @Composable
 private fun MacSwitch(checked: Boolean, p: Palette, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+    val trackColor by animateColorAsState(if (checked) p.accent else p.segmentTrack, tween(180))
     Switch(
         checked = checked,
         onCheckedChange = onChange,
         enabled = enabled,
         colors =
         SwitchDefaults.colors(
-            checkedTrackColor = p.accent,
+            checkedTrackColor = trackColor,
             checkedThumbColor = Color.White,
             checkedBorderColor = Color.Transparent,
             uncheckedThumbColor = Color.White,
-            uncheckedTrackColor = p.segmentTrack,
+            uncheckedTrackColor = trackColor,
             uncheckedBorderColor = Color.Transparent,
         ),
         thumbContent = {},
