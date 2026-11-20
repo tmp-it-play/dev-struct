@@ -21,6 +21,10 @@ object Settings {
     var autoMove: Boolean
         get() = prefs.getBoolean("autoMove", false)
         set(value) = prefs.putBoolean("autoMove", value)
+
+    var loginItemInitialized: Boolean
+        get() = prefs.getBoolean("loginItemInitialized", false)
+        set(value) = prefs.putBoolean("loginItemInitialized", value)
 }
 
 /** 로그인 시 실행. .app 번들로 실행했을 때만 쓸 수 있다. */
@@ -50,6 +54,13 @@ object LoginItem {
             </plist>
             """.trimIndent(),
         )
+    }
+
+    /** 처음 실행하면 켜고, 켜져 있으면 앱 위치가 바뀌었을 수 있으니 다시 쓴다. 사용자가 끈 건 유지한다. */
+    fun syncOnStart() {
+        if (!available) return
+        if (!Settings.loginItemInitialized || enabled) enable()
+        Settings.loginItemInitialized = true
     }
 
     fun disable() {

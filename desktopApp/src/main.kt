@@ -23,6 +23,7 @@ import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
     if ("--dry-run" in args) dryRun()
+    LoginItem.syncOnStart()
     application {
         val scope = rememberCoroutineScope()
         val trayState = rememberTrayState()
