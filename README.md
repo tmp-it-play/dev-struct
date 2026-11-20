@@ -1,16 +1,15 @@
-This is a Kotlin Multiplatform project targeting Desktop (JVM), built with the [Kotlin Toolchain](https://kotlin-toolchain.org/dev/).
+# DevStruct
 
-- [/desktopApp](./desktopApp) contains the desktop (JVM) application.
-- [/shared](./shared) holds the code shared across your applications — Compose UI, business logic, and platform-specific implementations. [src](./shared/src) is for common code; the sibling `src@<platform>` folders (for example `src@android`) hold code compiled only for the platform named in the folder.
+지정한 폴더 아래의 git 레포를 `소유자/레포명` 구조로 자동 정리해주는 macOS 메뉴바 앱입니다.
 
-The `kotlin` (macOS/Linux) and `kotlin.bat` (Windows) scripts in the project root are self-bootstrapping wrappers for the Kotlin Toolchain: they download the pinned toolchain version on first use, so no separate installation is required. Build the whole project with `./kotlin build`.
+- 레포 이름이 바뀌거나 소유권이 이전되면 폴더와 git remote를 맞춰줍니다.
+- fork는 `OpenSource` 폴더로 모읍니다.
+- JetBrains IDE가 켜져 있으면 기다렸다가 IDE가 꺼지면 옮기고, IDE의 프로젝트 경로도 함께 바꿉니다.
 
-### Running
+## 실행
 
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also run each module from the command line:
+`gh` CLI에 로그인되어 있어야 합니다.
 
-- Desktop app: `./kotlin run -m desktopApp`
-
----
-
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html), [Kotlin Toolchain](https://kotlin-toolchain.org/dev/), [Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/).
+```sh
+./kotlin run -m desktopApp
+```
