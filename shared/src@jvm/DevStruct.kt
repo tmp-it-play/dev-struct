@@ -113,6 +113,8 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     private suspend fun scan() {
         scanning = true
         try {
+            // 레포 확인이 한도에 걸려도 업데이트는 알 수 있게 먼저 확인한다(ETag로 304면 한도를 쓰지 않는다)
+            val updateLimit = checkUpdate()
             val organizer = Organizer(Path.of(Settings.root), ::log)
             val result = withContext(Dispatchers.IO) { organizer.scan() }
             val plans = result.plans
@@ -125,13 +127,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             approved = approved.filterTo(mutableSetOf()) { dir -> pending.any { it.dir == dir } }
             log("스캔 완료: 레포 ${plans.size}개, 이동 필요 ${moves.size}개")
             loggedIn = GitHubAuth.token() != null
-            val limitedUntil =
-                result.limitedUntil ?: runCatching {
-                    val latest = withContext(Dispatchers.IO) { Updater.latestNewer() }
-                    if (latest != null && latest != update) notify("새 버전 ${latest.tag}을 설치할 수 있어요")
-                    update = latest
-                    null
-                }.getOrElse { (it as? GitHubLimitException)?.resetAt ?: throw it }
+            val limitedUntil = result.limitedUntil ?: updateLimit
             problem = limitedUntil?.let(::limitMessage)
             // 한도가 풀리기 전에는 다시 확인하지 않는다
             if (limitedUntil != null) nextScanAt = maxOf(nextScanAt, limitedUntil + 5_000)
@@ -142,6 +138,16 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         } finally {
             scanning = false
         }
+    }
+
+    /** 한도에 걸렸으면 초기화 시각을 돌려준다 */
+    private suspend fun checkUpdate(): Long? = try {
+        val latest = withContext(Dispatchers.IO) { Updater.latestNewer() }
+        if (latest != null && latest != update) notify("새 버전 ${latest.tag}을 설치할 수 있어요")
+        update = latest
+        null
+    } catch (e: GitHubLimitException) {
+        e.resetAt
     }
 
     private fun limitMessage(resetAt: Long): String {
