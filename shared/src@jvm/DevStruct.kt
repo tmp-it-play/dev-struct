@@ -44,6 +44,16 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     var autoMove by mutableStateOf(Settings.autoMove)
         private set
 
+    /** 사용자가 지금 위치에 고정한 저장소(마지막 확인 기준) */
+    var pinned by mutableStateOf<List<RepoPlan>>(emptyList())
+        private set
+
+    /** 수동 업데이트 확인 결과("최신 버전이에요" 등) */
+    var updateStatus by mutableStateOf<String?>(null)
+        private set
+    var checkingUpdate by mutableStateOf(false)
+        private set
+
     private val scanRequest = Channel<Unit>(Channel.CONFLATED)
 
     fun start() = scope.launch {
@@ -76,12 +86,23 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
                 return@launch
             }
             deviceCode = code
+            // 브라우저에 붙여넣기만 하면 되도록 코드를 복사해 둔다
+            runCatching {
+                java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(
+                    java.awt.datatransfer.StringSelection(code.userCode),
+                    null,
+                )
+            }
+            notify("로그인 코드 ${code.userCode}를 복사했어요. 열린 브라우저에 붙여넣으세요")
             runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(code.verificationUri)) }
             val error = withContext(Dispatchers.IO) { GitHubAuth.awaitToken(code) }
             deviceCode = null
             loggedIn = GitHubAuth.token() != null
             error?.let(::log)
-            if (loggedIn) scanNow()
+            if (loggedIn) {
+                notify("GitHub에 로그인했어요")
+                scanNow()
+            }
         }
     }
 
@@ -100,6 +121,40 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         scanNow()
     }
 
+    fun checkForUpdate() {
+        if (checkingUpdate) return
+        scope.launch {
+            checkingUpdate = true
+            updateStatus = null
+            val limit = checkUpdate()
+            updateStatus =
+                when {
+                    limit != null -> limitMessage(limit)
+                    update == null -> "최신 버전이에요"
+                    else -> null
+                }
+            checkingUpdate = false
+        }
+    }
+
+    /** 지금 위치에 고정하면 다시는 옮기지 않는다 */
+    fun pin(plan: RepoPlan) {
+        scope.launch {
+            withContext(Dispatchers.IO) { Organizer(Path.of(Settings.root), ::log).setPinned(plan.dir, true) }
+            pending = pending.filter { it.dir != plan.dir }
+            approved = approved - plan.dir
+            pinned = (pinned + plan.copy(pinned = true)).sortedBy { it.dir }
+        }
+    }
+
+    fun unpin(plan: RepoPlan) {
+        scope.launch {
+            withContext(Dispatchers.IO) { Organizer(Path.of(Settings.root), ::log).setPinned(plan.dir, false) }
+            pinned = pinned.filter { it.dir != plan.dir }
+            scanNow()
+        }
+    }
+
     fun approve(plan: RepoPlan) {
         approved += plan.dir
         scanNow()
@@ -113,25 +168,26 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     private suspend fun scan() {
         scanning = true
         try {
-            // 레포 확인이 한도에 걸려도 업데이트는 알 수 있게 먼저 확인한다(ETag로 304면 한도를 쓰지 않는다)
+            // 저장소 확인이 한도에 걸려도 업데이트는 알 수 있게 먼저 확인한다(ETag로 304면 한도를 쓰지 않는다)
             val updateLimit = checkUpdate()
             val organizer = Organizer(Path.of(Settings.root), ::log)
             val result = withContext(Dispatchers.IO) { organizer.scan() }
             val plans = result.plans
             withContext(Dispatchers.IO) { plans.forEach(organizer::applyGit) }
             val moves = plans.filter { it.needsMove }
+            pinned = plans.filter { it.pinned }.sortedBy { it.dir }
             val isNew = moves.any { m -> pending.none { it.dir == m.dir } }
-            // 한도에 걸려 중간에 멈췄으면 아직 못 본 레포의 기존 대기 항목은 남긴다
+            // 한도에 걸려 중간에 멈췄으면 아직 못 본 저장소의 기존 대기 항목은 남긴다
             val scanned = plans.map { it.dir }.toSet()
             pending = if (result.limitedUntil == null) moves else pending.filter { it.dir !in scanned } + moves
             approved = approved.filterTo(mutableSetOf()) { dir -> pending.any { it.dir == dir } }
-            log("스캔 완료: 레포 ${plans.size}개, 이동 필요 ${moves.size}개")
+            log("스캔 완료: 저장소 ${plans.size}개, 이동 필요 ${moves.size}개")
             loggedIn = GitHubAuth.token() != null
             val limitedUntil = result.limitedUntil ?: updateLimit
             problem = limitedUntil?.let(::limitMessage)
             // 한도가 풀리기 전에는 다시 확인하지 않는다
             if (limitedUntil != null) nextScanAt = maxOf(nextScanAt, limitedUntil + 5_000)
-            if (isNew && !autoMove) notify("옮길 레포가 ${moves.size}개 있어요")
+            if (isNew && !autoMove) notify("옮길 저장소가 ${moves.size}개 있어요")
         } catch (e: Exception) {
             log("스캔 실패: $e")
             problem = "폴더를 확인하지 못했어요"
@@ -175,7 +231,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             }
         pending = pending - ready.toSet()
         approved = approved - ready.map { it.dir }.toSet()
-        if (done.isNotEmpty()) notify("레포 ${done.size}개를 옮겼어요")
+        if (done.isNotEmpty()) notify("저장소 ${done.size}개를 옮겼어요")
     }
 
     private fun log(message: String) {

@@ -35,7 +35,7 @@ import kotlin.system.exitProcess
 
 // 팝오버 크기
 private const val WIDTH = 340
-private const val MAX_HEIGHT = 780
+private const val MAX_HEIGHT = 860
 
 fun main(args: Array<String>) {
     if ("--dry-run" in args) dryRun()
@@ -49,6 +49,9 @@ fun main(args: Array<String>) {
         var open by remember { mutableStateOf(LoginItem.BACKGROUND_ARG !in args) }
         var anchor by remember { mutableStateOf<Point?>(null) }
         var hiddenAt by remember { mutableStateOf(0L) }
+        // 열면서 앱을 활성화하는 동안 포커스가 잠깐 오가므로, 직후의 닫기 신호는 무시한다
+        var openedAt by remember { mutableStateOf(0L) }
+        val justOpened = { System.currentTimeMillis() - openedAt < 500 }
         val trayIcon = remember { TrayIcon(trayImage(), "DevStruct").apply { isImageAutoSize = true } }
         val app =
             remember {
@@ -92,6 +95,7 @@ fun main(args: Array<String>) {
                 val listener =
                     object : WindowAdapter() {
                         override fun windowLostFocus(e: WindowEvent) {
+                            if (justOpened()) return
                             open = false
                             hiddenAt = System.currentTimeMillis()
                         }
@@ -107,13 +111,16 @@ fun main(args: Array<String>) {
             }
             LaunchedEffect(open, anchor) {
                 if (!open) return@LaunchedEffect
+                openedAt = System.currentTimeMillis()
                 // 메뉴바 앱은 저절로 활성 앱이 되지 않아 포커스를 잃는 일도 없다. 활성화해야 다른 앱을 누를 때 닫힌다
                 runCatching { Desktop.getDesktop().requestForeground(true) }
                 window.toFront()
                 window.requestFocus()
                 while (true) {
                     // 다른 메뉴바 앱처럼 팝오버 바깥을 누르면 닫는다(포커스 이벤트가 오지 않는 경우까지)
-                    if (GlobalMouse.pressed() && !window.bounds.contains(MouseInfo.getPointerInfo().location)) {
+                    if (!justOpened() && GlobalMouse.pressed() &&
+                        !window.bounds.contains(MouseInfo.getPointerInfo().location)
+                    ) {
                         open = false
                         hiddenAt = System.currentTimeMillis()
                         break
@@ -125,7 +132,10 @@ fun main(args: Array<String>) {
                     delay(100)
                 }
             }
-            Popover(app, onQuit = ::exitApplication) {
+            Popover(app, onQuit = ::exitApplication, onClose = {
+                open = false
+                hiddenAt = System.currentTimeMillis()
+            }) {
                 windowState.size =
                     DpSize(WIDTH.dp, it.coerceAtMost(MAX_HEIGHT.dp))
             }
@@ -170,6 +180,6 @@ private fun dryRun(): Nothing {
     plans.filter {
         it.needsMove
     }.forEach { println("move:   ${root.relativize(it.dir)} → ${root.relativize(it.target)}") }
-    println("레포 ${plans.size}개, IDE 실행 중: ${JetBrains.runningIdes().ifEmpty { listOf("없음") }.joinToString()}")
+    println("저장소 ${plans.size}개, IDE 실행 중: ${JetBrains.runningIdes().ifEmpty { listOf("없음") }.joinToString()}")
     exitProcess(0)
 }

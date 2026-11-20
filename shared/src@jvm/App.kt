@@ -34,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
@@ -134,7 +135,7 @@ private enum class Tab(val label: String) {
 /** 메뉴바 팝오버 내용. 그림자는 macOS가 그린다. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Popover(app: DevStruct, onQuit: () -> Unit, onHeightChange: (Dp) -> Unit) {
+fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit, onHeightChange: (Dp) -> Unit) {
     val p = if (isSystemInDarkTheme()) Dark else Light
     var tab by remember { mutableStateOf(Tab.Repos) }
     val shape = RoundedCornerShape(16.dp)
@@ -156,14 +157,14 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onHeightChange: (Dp) -> Unit) {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 400.dp, max = 640.dp)
+                        .heightIn(min = 400.dp, max = 720.dp)
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     when (tab) {
-                        Tab.Repos -> ReposTab(app, p)
-                        Tab.Settings -> SettingsTab(app, p)
+                        Tab.Repos -> ReposTab(app, p, onClose)
+                        Tab.Settings -> SettingsTab(app, p, onClose)
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -174,7 +175,7 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onHeightChange: (Dp) -> Unit) {
 }
 
 @Composable
-private fun ColumnScope.ReposTab(app: DevStruct, p: Palette) {
+private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit) {
     app.deviceCode?.let { code ->
         Group(p) {
             Column(Modifier.fillMaxWidth().padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -202,7 +203,12 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette) {
 
     if (!app.loggedIn && app.deviceCode == null) {
         SectionTitle("GitHub", p)
-        ItemRow(Icons.Filled.Lock, "로그인", "비공개 레포도 함께 정리해요", p) { Pill("로그인", p, app::login) }
+        ItemRow(Icons.Filled.Lock, "로그인", "비공개 저장소도 함께 정리해요", p) {
+            Pill("로그인", p) {
+                app.login()
+                onClose()
+            }
+        }
     }
 
     if (app.pending.isEmpty()) {
@@ -217,7 +223,7 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette) {
         return
     }
 
-    SectionTitle("옮길 레포", p) {
+    SectionTitle("옮길 저장소", p) {
         if (!app.autoMove && app.pending.any { it.dir !in app.approved }) {
             Text(
                 "모두 승인",
@@ -235,17 +241,20 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette) {
         val detail =
             if (from.parent == to.parent) "${from.name}에서 이름 변경" else "${from.parent ?: "루트 폴더"} → ${to.parent}"
         ItemRow(Icons.Filled.ArrowForward, plan.repo.ref.name, detail, p) {
-            if (app.autoMove || plan.dir in app.approved) {
-                Text("대기 중", color = p.secondary, fontSize = 11.sp)
-            } else {
-                Pill("승인", p) { app.approve(plan) }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Pill("고정", p, subtle = true) { app.pin(plan) }
+                if (app.autoMove || plan.dir in app.approved) {
+                    Text("대기 중", color = p.secondary, fontSize = 11.sp)
+                } else {
+                    Pill("승인", p) { app.approve(plan) }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette) {
+private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> Unit) {
     var root by remember { mutableStateOf(Settings.root) }
     var interval by remember { mutableStateOf(Settings.intervalMinutes) }
     var loginItem by remember { mutableStateOf(LoginItem.enabled) }
@@ -288,7 +297,7 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette) {
 
     SectionTitle("동작", p)
     Group(p) {
-        SettingRow("자동으로 옮기기", p, info = "켜면 옮길 레포를 찾는 즉시 옮겨요. 끄면 정리 탭에서 승인한 레포만 옮겨요.") {
+        SettingRow("자동으로 옮기기", p, info = "켜면 옮길 저장소를 찾는 즉시 옮겨요. 끄면 정리 탭에서 승인한 저장소만 옮겨요.") {
             MacSwitch(app.autoMove, p, onChange = app::updateAutoMove)
         }
         Hairline(p)
@@ -315,9 +324,38 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette) {
     SectionTitle("GitHub", p)
     Group(p) {
         SettingRow(if (app.loggedIn) "로그인됨" else "로그인 안 됨", p) {
-            if (app.loggedIn) Pill("로그아웃", p, app::logout) else Pill("로그인", p, app::login)
+            if (app.loggedIn) {
+                Pill("로그아웃", p, onClick = app::logout)
+            } else {
+                Pill("로그인", p) {
+                    app.login()
+                    onClose()
+                }
+            }
         }
     }
+
+    SectionTitle("업데이트", p)
+    Group(p) {
+        SettingRow("버전 $APP_VERSION", p) {
+            val update = app.update
+            when {
+                update != null -> Pill("${update.tag} 설치", p, onClick = app::installUpdate)
+                app.checkingUpdate -> Text("확인하는 중…", color = p.secondary, fontSize = 12.sp)
+                else -> Pill("업데이트 확인", p, onClick = app::checkForUpdate)
+            }
+        }
+        app.updateStatus?.let {
+            Text(
+                it,
+                color = p.secondary,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 9.dp),
+            )
+        }
+    }
+
+    if (app.pinned.isNotEmpty()) PinnedSection(app, p)
 
     SectionTitle("정보", p)
     Group(p) {
@@ -399,14 +437,7 @@ private fun Footer(app: DevStruct, p: Palette, tab: Tab, onQuit: () -> Unit) {
         Modifier.fillMaxWidth().background(p.footer).padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val update = app.update
         when {
-            update != null -> Text(
-                "${update.tag} 설치",
-                color = p.accent,
-                fontSize = 12.sp,
-                modifier = Modifier.pressable(app::installUpdate),
-            )
             tab == Tab.Settings -> Text("DevStruct $APP_VERSION", color = p.secondary, fontSize = 12.sp)
             app.scanning -> Text("확인하는 중…", color = p.secondary, fontSize = 12.sp)
             else -> {
@@ -551,18 +582,69 @@ private fun Hairline(p: Palette) =
     Box(Modifier.padding(start = 12.dp).fillMaxWidth().height(0.5.dp).background(p.hairline))
 
 @Composable
-private fun Pill(label: String, p: Palette, onClick: () -> Unit) {
+private fun Pill(label: String, p: Palette, subtle: Boolean = false, onClick: () -> Unit) {
+    val color = if (subtle) p.secondary else p.accent
     Text(
         label,
-        color = p.accent,
+        color = color,
         fontSize = 12.sp,
         fontWeight = FontWeight.Medium,
-        modifier = Modifier.clip(
-            CircleShape,
-        ).background(
-            p.accent.copy(alpha = 0.14f),
-        ).pressable(onClick).padding(horizontal = 11.dp, vertical = 3.dp),
+        modifier =
+        Modifier
+            .clip(CircleShape)
+            .background(if (subtle) p.segmentTrack else color.copy(alpha = 0.14f))
+            .pressable(onClick)
+            .padding(horizontal = 11.dp, vertical = 3.dp),
     )
+}
+
+/** 고정된 저장소 목록. 기본은 접혀 있다 */
+@Composable
+private fun PinnedSection(app: DevStruct, p: Palette) {
+    var expanded by remember { mutableStateOf(false) }
+    SectionTitle("예외", p)
+    Group(p) {
+        Row(
+            Modifier.fillMaxWidth().height(38.dp).pressable { expanded = !expanded }.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("고정된 저장소 ${app.pinned.size}개", color = p.label, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Icon(
+                if (expanded) Icons.Filled.KeyboardArrowDown else Icons.Filled.KeyboardArrowRight,
+                null,
+                tint = p.tertiary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        if (expanded) {
+            val root = Path.of(Settings.root)
+            app.pinned.forEach { plan ->
+                Hairline(p)
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            plan.repo.ref.name,
+                            color = p.label,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            root.relativize(plan.dir).toString(),
+                            color = p.secondary,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Pill("해제", p, subtle = true) { app.unpin(plan) }
+                }
+            }
+        }
+    }
 }
 
 @Composable
