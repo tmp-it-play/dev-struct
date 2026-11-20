@@ -10,7 +10,10 @@ import kotlin.io.path.writeText
 
 object JetBrains {
     private val home = System.getProperty("user.home")
-    private val configRoot = Path.of(home, "Library/Application Support/JetBrains")
+
+    // Android Studio는 JetBrains 플랫폼이지만 설정을 Google 아래에 둔다
+    private val configRoots =
+        listOf("JetBrains", "Google").map { Path.of(home, "Library/Application Support", it) }
     private val ideBinaries =
         setOf(
             "idea",
@@ -24,8 +27,14 @@ object JetBrains {
             "phpstorm",
             "rustrover",
             "dataspell",
+            "aqua",
+            "writerside",
+            // Android Studio
+            "studio",
         )
-    private val projectFiles = listOf("recentProjects.xml", "trusted-paths.xml")
+
+    // Rider는 최근 목록을 recentSolutions.xml에 둔다
+    private val projectFiles = listOf("recentProjects.xml", "recentSolutions.xml", "trusted-paths.xml")
 
     /** 실행 중인 JetBrains IDE 앱 이름 목록. IDE는 종료 시 설정 파일을 덮어쓰므로 비어 있을 때만 relink 해야 한다. */
     fun runningIdes(): List<String> = ProcessHandle
@@ -38,9 +47,9 @@ object JetBrains {
 
     /** 모든 IDE·버전의 최근 프로젝트/신뢰 경로를 새 위치로 바꾼다. 원본은 .devstruct.bak로 남긴다. */
     fun relink(from: Path, to: Path) {
-        if (!Files.isDirectory(configRoot)) return
-        configRoot
-            .listDirectoryEntries()
+        configRoots
+            .filter { Files.isDirectory(it) }
+            .flatMap { it.listDirectoryEntries() }
             .flatMap { product -> projectFiles.map { product.resolve("options/$it") } }
             .filter { it.isRegularFile() }
             .forEach { file ->
