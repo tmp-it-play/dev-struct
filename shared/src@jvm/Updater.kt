@@ -36,11 +36,16 @@ object Updater {
         }
     }
 
-    fun install(release: Release): String? {
+    fun install(release: Release, onProgress: (Float) -> Unit = {}): String? {
         val bundle = appBundle ?: return "앱 번들(.app)로 실행할 때만 업데이트할 수 있어요"
         val tmp = Files.createTempDirectory("devstruct-update")
         val dmg = tmp.resolve(release.asset)
-        if (!runCatching { GitHub.download(release.url, dmg) }.getOrDefault(false)) return "다운로드 실패: ${release.url}"
+        if (!runCatching {
+                GitHub.download(release.url, dmg, onProgress)
+            }.getOrDefault(false)
+        ) {
+            return "다운로드 실패: ${release.url}"
+        }
         val mount = tmp.resolve("mnt")
         // hdiutil attach는 deprecated. diskutil image가 없는 구버전 macOS에서만 hdiutil을 쓴다
         val attach =

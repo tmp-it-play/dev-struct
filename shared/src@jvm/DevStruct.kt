@@ -54,6 +54,10 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     var checkingUpdate by mutableStateOf(false)
         private set
 
+    /** 업데이트 내려받기 진행률(0..1). 설치 중이 아니면 null */
+    var updateProgress by mutableStateOf<Float?>(null)
+        private set
+
     private val scanRequest = Channel<Unit>(Channel.CONFLATED)
 
     fun start() = scope.launch {
@@ -70,10 +74,25 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
 
     fun installUpdate() {
         val release = update ?: return
+        if (updateProgress != null) return
+        updateProgress = 0f
         scope.launch {
-            withContext(Dispatchers.IO) { Updater.install(release) }?.let {
+            val error =
+                withContext(Dispatchers.IO) {
+                    // 진행률은 Main에서만 바꾸고, 퍼센트가 바뀔 때만 알린다
+                    var lastPercent = -1
+                    Updater.install(release) { progress ->
+                        val percent = (progress * 100).toInt()
+                        if (percent != lastPercent) {
+                            lastPercent = percent
+                            scope.launch { updateProgress = progress }
+                        }
+                    }
+                }
+            updateProgress = null
+            error?.let {
                 log(it)
-                problem = "업데이트하지 못했어요"
+                updateStatus = "업데이트하지 못했어요"
             }
         }
     }

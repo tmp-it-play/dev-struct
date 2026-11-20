@@ -106,9 +106,26 @@ object GitHub {
         return Json.parseToJsonElement(http.send(request, HttpResponse.BodyHandlers.ofString()).body()).jsonObject
     }
 
-    fun download(url: String, dest: Path): Boolean {
+    /** onProgress에 0..1 진행률을 알린다(크기를 모르면 알리지 않는다) */
+    fun download(url: String, dest: Path, onProgress: (Float) -> Unit = {}): Boolean {
         val request = HttpRequest.newBuilder(URI.create(url)).build()
-        return http.send(request, HttpResponse.BodyHandlers.ofFile(dest)).statusCode() in 200..299
+        val response = http.send(request, HttpResponse.BodyHandlers.ofInputStream())
+        if (response.statusCode() !in 200..299) return false
+        val total = response.headers().firstValueAsLong("Content-Length").orElse(-1)
+        response.body().use { input ->
+            java.nio.file.Files.newOutputStream(dest).use { output ->
+                val buffer = ByteArray(64 * 1024)
+                var done = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    output.write(buffer, 0, read)
+                    done += read
+                    if (total > 0) onProgress(done.toFloat() / total)
+                }
+            }
+        }
+        return true
     }
 }
 
