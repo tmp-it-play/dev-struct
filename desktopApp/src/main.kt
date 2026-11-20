@@ -114,8 +114,13 @@ fun main(args: Array<String>) {
                 openedAt = System.currentTimeMillis()
                 // 메뉴바 앱은 저절로 활성 앱이 되지 않아 포커스를 잃는 일도 없다. 활성화해야 다른 앱을 누를 때 닫힌다
                 runCatching { Desktop.getDesktop().requestForeground(true) }
-                window.toFront()
-                window.requestFocus()
+                // 창이 실제로 뜬 뒤에 포커스를 줘야 첫 클릭이 창 활성화에 먹히지 않고 버튼에 전달된다
+                repeat(3) {
+                    window.toFront()
+                    window.requestFocus()
+                    delay(60)
+                }
+                var placed: Point? = null
                 while (true) {
                     // 다른 메뉴바 앱처럼 팝오버 바깥을 누르면 닫는다(포커스 이벤트가 오지 않는 경우까지)
                     if (!justOpened() && GlobalMouse.pressed() &&
@@ -126,9 +131,12 @@ fun main(args: Array<String>) {
                         break
                     }
                     // 열려 있는 동안 아이콘 위치를 따라간다
+                    // 아이콘 위치가 실제로 바뀔 때만 옮긴다(클릭 도중 창을 다시 놓으면 클릭이 취소된다)
                     val location = popoverLocation(trayIconLocation(trayIcon), anchor)
-                    val target = WindowPosition(location.x.dp, location.y.dp)
-                    if (windowState.position != target || window.location != location) windowState.position = target
+                    if (location != placed) {
+                        windowState.position = WindowPosition(location.x.dp, location.y.dp)
+                        placed = location
+                    }
                     delay(100)
                 }
             }
