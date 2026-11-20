@@ -1,8 +1,15 @@
 package team.themoment.dev_struct
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,12 +36,14 @@ import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -43,7 +52,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -115,6 +126,7 @@ private enum class Tab(val label: String) {
 }
 
 /** 메뉴바 팝오버 내용. 바깥 여백은 그림자 자리다. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Popover(app: DevStruct, onQuit: () -> Unit, onHeightChange: (Dp) -> Unit) {
     val p = if (isSystemInDarkTheme()) Dark else Light
@@ -122,33 +134,36 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onHeightChange: (Dp) -> Unit) {
     val shape = RoundedCornerShape(16.dp)
     val density = LocalDensity.current
 
-    Box(Modifier.fillMaxSize().padding(10.dp)) {
-        // 창 높이를 내용에 맞추도록 실제 높이를 알려준다
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .onSizeChanged { with(density) { onHeightChange(it.height.toDp() + 20.dp) } }
-                .shadow(20.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
-                .clip(shape)
-                .background(p.window)
-                .border(0.5.dp, p.hairline, shape),
-        ) {
-            Segmented(Tab.entries, tab, { it.label }, p, Modifier.padding(10.dp)) { tab = it }
+    // Material 물결 효과(Switch 등)를 끈다
+    CompositionLocalProvider(LocalRippleConfiguration provides null) {
+        Box(Modifier.fillMaxSize().padding(10.dp)) {
+            // 창 높이를 내용에 맞추도록 실제 높이를 알려준다
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 140.dp, max = 440.dp)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                    .onSizeChanged { with(density) { onHeightChange(it.height.toDp() + 20.dp) } }
+                    .shadow(20.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
+                    .clip(shape)
+                    .background(p.window)
+                    .border(0.5.dp, p.hairline, shape),
             ) {
-                when (tab) {
-                    Tab.Repos -> ReposTab(app, p)
-                    Tab.Settings -> SettingsTab(app, p)
+                Segmented(Tab.entries, tab, { it.label }, p, Modifier.padding(10.dp)) { tab = it }
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 140.dp, max = 440.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    when (tab) {
+                        Tab.Repos -> ReposTab(app, p)
+                        Tab.Settings -> SettingsTab(app, p)
+                    }
+                    Spacer(Modifier.height(8.dp))
                 }
-                Spacer(Modifier.height(8.dp))
+                Footer(app, p, tab, onQuit)
             }
-            Footer(app, p, tab, onQuit)
         }
     }
 }
@@ -204,7 +219,7 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette) {
                 color = p.accent,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.clickable(onClick = app::approveAll),
+                modifier = Modifier.pressable(app::approveAll),
             )
         }
     }
@@ -306,7 +321,7 @@ private fun Footer(app: DevStruct, p: Palette, tab: Tab, onQuit: () -> Unit) {
                 "${update.tag} 설치",
                 color = p.accent,
                 fontSize = 12.sp,
-                modifier = Modifier.clickable(onClick = app::installUpdate),
+                modifier = Modifier.pressable(app::installUpdate),
             )
             tab == Tab.Settings -> Text("DevStruct $APP_VERSION", color = p.secondary, fontSize = 12.sp)
             app.scanning -> Text("확인하는 중…", color = p.secondary, fontSize = 12.sp)
@@ -316,15 +331,17 @@ private fun Footer(app: DevStruct, p: Palette, tab: Tab, onQuit: () -> Unit) {
             }
         }
         Spacer(Modifier.weight(1f))
-        if (app.scanning) {
-            Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.size(14.dp), color = p.secondary, strokeWidth = 1.5.dp)
-            }
-        } else {
-            CircleButton(Icons.Filled.Refresh, "지금 확인", p, app::scanNow)
+        // 확인하는 동안에는 새로고침 아이콘이 천천히 돈다
+        val spin by rememberInfiniteTransition().animateFloat(
+            0f,
+            360f,
+            infiniteRepeatable(tween(1200, easing = LinearEasing)),
+        )
+        CircleButton(Icons.Filled.Refresh, "지금 확인", p, if (app.scanning) Modifier.rotate(spin) else Modifier) {
+            if (!app.scanning) app.scanNow()
         }
         Spacer(Modifier.width(6.dp))
-        CircleButton(Icons.Filled.ExitToApp, "종료", p, onQuit)
+        CircleButton(Icons.Filled.ExitToApp, "종료", p, onClick = onQuit)
     }
 }
 
@@ -347,7 +364,7 @@ private fun <T> Segmented(
                     .then(if (isSelected) Modifier.shadow(1.dp, CircleShape) else Modifier)
                     .clip(CircleShape)
                     .background(if (isSelected) p.segmentThumb else Color.Transparent)
-                    .clickable { onSelect(option) }
+                    .pressable { onSelect(option) }
                     .padding(vertical = 4.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -437,18 +454,32 @@ private fun Pill(label: String, p: Palette, onClick: () -> Unit) {
             CircleShape,
         ).background(
             p.accent.copy(alpha = 0.14f),
-        ).clickable(onClick = onClick).padding(horizontal = 11.dp, vertical = 3.dp),
+        ).pressable(onClick).padding(horizontal = 11.dp, vertical = 3.dp),
     )
 }
 
 @Composable
-private fun CircleButton(icon: ImageVector, description: String, p: Palette, onClick: () -> Unit) {
+private fun CircleButton(
+    icon: ImageVector,
+    description: String,
+    p: Palette,
+    iconModifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     Box(
-        Modifier.size(28.dp).clip(CircleShape).background(p.segmentTrack).clickable(onClick = onClick),
+        Modifier.size(28.dp).clip(CircleShape).background(p.segmentTrack).pressable(onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, description, tint = p.secondary, modifier = Modifier.size(15.dp))
+        Icon(icon, description, tint = p.secondary, modifier = iconModifier.size(15.dp))
     }
+}
+
+/** macOS처럼 물결·사각 강조 없이 누르는 동안만 살짝 흐려진다 */
+@Composable
+private fun Modifier.pressable(onClick: () -> Unit): Modifier {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    return alpha(if (pressed) 0.5f else 1f).clickable(source, indication = null, onClick = onClick)
 }
 
 @Composable
