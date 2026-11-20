@@ -14,18 +14,6 @@ JetBrains IDE가 켜져 있으면 기다렸다가 IDE가 꺼지면 옮기고, ID
 
 ### 지원 IDE
 
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/IntelliJ_IDEA_icon.svg" width="40" alt="IntelliJ IDEA" title="IntelliJ IDEA">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/WebStorm_icon.svg" width="40" alt="WebStorm" title="WebStorm">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/PyCharm_icon.svg" width="40" alt="PyCharm" title="PyCharm">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/GoLand_icon.svg" width="40" alt="GoLand" title="GoLand">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/DataGrip_icon.svg" width="40" alt="DataGrip" title="DataGrip">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/CLion_icon.svg" width="40" alt="CLion" title="CLion">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/Rider_icon.svg" width="40" alt="Rider" title="Rider">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/PhpStorm_icon.svg" width="40" alt="PhpStorm" title="PhpStorm">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/RubyMine_icon.svg" width="40" alt="RubyMine" title="RubyMine">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/RustRover_icon.svg" width="40" alt="RustRover" title="RustRover">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/DataSpell_icon.svg" width="40" alt="DataSpell" title="DataSpell">
-<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/Aqua_icon.svg" width="40" alt="Aqua" title="Aqua">
-<img src="https://cdn.simpleicons.org/androidstudio" width="40" alt="Android Studio" title="Android Studio">
+<p><img src="https://resources.jetbrains.com/storage/products/company/brand/logos/IntelliJ_IDEA_icon.svg" width="40" alt="IntelliJ IDEA" title="IntelliJ IDEA">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/WebStorm_icon.svg" width="40" alt="WebStorm" title="WebStorm">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/PyCharm_icon.svg" width="40" alt="PyCharm" title="PyCharm">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/GoLand_icon.svg" width="40" alt="GoLand" title="GoLand">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/DataGrip_icon.svg" width="40" alt="DataGrip" title="DataGrip">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/CLion_icon.svg" width="40" alt="CLion" title="CLion">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/Rider_icon.svg" width="40" alt="Rider" title="Rider">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/PhpStorm_icon.svg" width="40" alt="PhpStorm" title="PhpStorm">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/RubyMine_icon.svg" width="40" alt="RubyMine" title="RubyMine">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/RustRover_icon.svg" width="40" alt="RustRover" title="RustRover">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/DataSpell_icon.svg" width="40" alt="DataSpell" title="DataSpell">&nbsp;<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/Aqua_icon.svg" width="40" alt="Aqua" title="Aqua">&nbsp;<img src="https://cdn.simpleicons.org/androidstudio" width="40" alt="Android Studio" title="Android Studio"></p>
 
 </div>
