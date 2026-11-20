@@ -9,6 +9,7 @@ import kotlin.system.exitProcess
 
 // CD가 태그(vX.Y.Z)와 이 값이 같은지 검사한다
 const val APP_VERSION = "2.1.1"
+const val AFTER_UPDATE_ARG = "--after-update"
 
 data class Release(val tag: String, val asset: String, val url: String)
 
@@ -81,8 +82,12 @@ object Updater {
             """
             while kill -0 $pid 2>/dev/null; do sleep 1; done
             mv "$bundle" "$bundle.old" || exit 1
-            if mv "$newApp" "$bundle"; then rm -rf "$bundle.old"; else mv "$bundle.old" "$bundle"; fi
-            open "$bundle"
+            if mv "$newApp" "$bundle"; then
+                rm -rf "$bundle.old"
+                open "$bundle" --args $AFTER_UPDATE_ARG
+            else
+                mv "$bundle.old" "$bundle" && open "$bundle"
+            fi
             """.trimIndent()
         ProcessBuilder("/bin/sh", "-c", script).start()
         exitProcess(0)

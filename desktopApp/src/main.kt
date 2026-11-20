@@ -3,6 +3,8 @@ package team.themoment.dev_struct
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,23 +48,44 @@ fun main(args: Array<String>) {
     // 메뉴바 앱: Dock 아이콘을 숨기고, 메뉴바 아이콘은 다크/라이트에 맞춰 색이 바뀌게 한다
     System.setProperty("apple.awt.UIElement", "true")
     System.setProperty("apple.awt.enableTemplateImages", "true")
+    val notifications = Updater.appBundle?.let(::MacNotifications)
     LoginItem.syncOnStart()
 
     application {
         val scope = rememberCoroutineScope()
-        var open by remember { mutableStateOf(LoginItem.BACKGROUND_ARG !in args) }
+        // 그냥 켜지면 메뉴바에만 두고, 업데이트로 다시 켜졌을 때만 바로 연다
+        var open by remember { mutableStateOf(AFTER_UPDATE_ARG in args) }
         var anchor by remember { mutableStateOf<Point?>(null) }
         var hiddenAt by remember { mutableStateOf(0L) }
         // 열면서 앱을 활성화하는 동안 포커스가 잠깐 오가므로, 직후의 닫기 신호는 무시한다
         var openedAt by remember { mutableStateOf(0L) }
         val justOpened = { System.currentTimeMillis() - openedAt < 500 }
         val trayIcon = remember { TrayIcon(trayImage(), "DevStruct").apply { isImageAutoSize = true } }
+        var notificationOpens by remember { mutableIntStateOf(0) }
         val app =
             remember {
-                DevStruct(scope) {
-                    trayIcon.displayMessage("DevStruct", it, TrayIcon.MessageType.NONE)
-                }.also { it.start() }
+                DevStruct(scope) { message, page ->
+                    if (notifications != null) {
+                        notifications.send(message, page)
+                    } else {
+                        trayIcon.displayMessage("DevStruct", message, TrayIcon.MessageType.NONE)
+                    }
+                }.also {
+                    if (AFTER_UPDATE_ARG in args) it.page = Page.Settings
+                    it.start()
+                }
             }
+        LaunchedEffect(notifications) {
+            if (notifications != null) {
+                for (page in notifications.opens) {
+                    openedAt = System.currentTimeMillis()
+                    app.page = page
+                    anchor = null
+                    open = true
+                    notificationOpens++
+                }
+            }
+        }
 
         DisposableEffect(Unit) {
             trayIcon.addMouseListener(
@@ -75,11 +98,6 @@ fun main(args: Array<String>) {
                     }
                 },
             )
-            // 알림을 누르면 팝오버를 연다
-            trayIcon.addActionListener {
-                anchor = null
-                open = true
-            }
             SystemTray.getSystemTray().add(trayIcon)
             onDispose { SystemTray.getSystemTray().remove(trayIcon) }
         }
@@ -113,7 +131,7 @@ fun main(args: Array<String>) {
                 window.rootPane.putClientProperty("Window.shadow", true)
                 onDispose {}
             }
-            LaunchedEffect(open, anchor) {
+            LaunchedEffect(open, anchor, notificationOpens) {
                 if (!open) return@LaunchedEffect
                 openedAt = System.currentTimeMillis()
                 // 메뉴바 앱은 저절로 활성 앱이 되지 않아 포커스를 잃는 일도 없다. 활성화해야 다른 앱을 누를 때 닫힌다
@@ -144,10 +162,12 @@ fun main(args: Array<String>) {
                     delay(100)
                 }
             }
-            Popover(app, onQuit = ::exitApplication, onClose = {
-                open = false
-                hiddenAt = System.currentTimeMillis()
-            })
+            key(notificationOpens) {
+                Popover(app, onQuit = ::exitApplication, onClose = {
+                    open = false
+                    hiddenAt = System.currentTimeMillis()
+                })
+            }
         }
     }
 }

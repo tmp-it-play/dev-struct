@@ -40,9 +40,6 @@ object Settings {
 
 /** 로그인 시 실행. .app 번들로 실행했을 때만 쓸 수 있다. */
 object LoginItem {
-    /** 로그인 시 실행되면 팝오버를 띄우지 않는다 */
-    const val BACKGROUND_ARG = "--background"
-
     private val plist =
         Path.of(System.getProperty("user.home"), "Library/LaunchAgents/team.themoment.devstruct.plist")
 
@@ -62,7 +59,7 @@ object LoginItem {
             <dict>
                 <key>Label</key><string>team.themoment.devstruct</string>
                 <key>ProgramArguments</key>
-                <array><string>/usr/bin/open</string><string>$bundle</string><string>--args</string><string>$BACKGROUND_ARG</string></array>
+                <array><string>/usr/bin/open</string><string>$bundle</string></array>
                 <key>RunAtLoad</key><true/>
             </dict>
             </plist>

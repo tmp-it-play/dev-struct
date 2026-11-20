@@ -19,6 +19,10 @@ cp build/tasks/_desktopApp_executableJarJvm/desktopApp-jvm-executable.jar dist/i
     --java-options --add-opens=java.desktop/java.awt=ALL-UNNAMED \
     --java-options --add-opens=java.desktop/sun.lwawt.macosx=ALL-UNNAMED \
     --dest dist
+frameworks=dist/DevStruct.app/Contents/Frameworks
+mkdir -p "$frameworks"
+xcrun clang -dynamiclib -fobjc-arc -mmacosx-version-min=11.0 -framework Foundation -framework UserNotifications \
+    packaging/Notifications.m -o "$frameworks/libDevStructNotifications.dylib"
 # 메뉴바 앱이라 Dock 아이콘을 숨긴다
 plutil -insert LSUIElement -bool true dist/DevStruct.app/Contents/Info.plist
 codesign --force --deep --sign - dist/DevStruct.app

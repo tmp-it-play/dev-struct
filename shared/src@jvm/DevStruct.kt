@@ -20,8 +20,15 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
+enum class Page(val label: String) {
+    Repos("정리"),
+    Settings("설정"),
+}
+
 /** 주기 스캔 + 이동 대기열. 상태는 Main(Swing) 스레드에서만 바꾼다. */
-class DevStruct(private val scope: CoroutineScope, private val notify: (String) -> Unit) {
+class DevStruct(private val scope: CoroutineScope, private val notify: (String, Page) -> Unit) {
+    var page by mutableStateOf(Page.Repos)
+
     var pending by mutableStateOf<List<RepoPlan>>(emptyList())
         private set
     var approved by mutableStateOf<Set<Path>>(emptySet())
@@ -93,8 +100,11 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             if (Settings.discover) {
                 val home = Path.of(System.getProperty("user.home"))
                 val found = withContext(discoveryDispatcher) { Discovery(home, Path.of(Settings.root)).scan() }
-                discovered = found.filter { !it.pinned }.sortedBy { it.dir }
+                val previous = discovered.map { it.dir }.toSet()
+                discovered = if (Settings.discover) found.filter { !it.pinned }.sortedBy { it.dir } else emptyList()
                 keptElsewhere = found.filter { it.pinned }.sortedBy { it.dir }
+                val newCount = discovered.count { it.dir !in previous }
+                if (newCount > 0) notify("홈 폴더에서 저장소 ${newCount}개를 찾았어요", Page.Repos)
                 log("홈 폴더 찾기 완료: 루트 밖 저장소 ${found.size}개")
             } else {
                 discovered = emptyList()
@@ -199,14 +209,14 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
                     null,
                 )
             }
-            notify("로그인 코드 ${code.userCode}를 복사했어요. 열린 브라우저에 붙여넣으세요")
+            notify("로그인 코드 ${code.userCode}를 복사했어요. 브라우저에 붙여넣으세요", Page.Repos)
             runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(code.verificationUri)) }
             val error = withContext(Dispatchers.IO) { GitHubAuth.awaitToken(code) }
             deviceCode = null
             loggedIn = GitHubAuth.token() != null
             error?.let(::log)
             if (loggedIn) {
-                notify("GitHub에 로그인했어요")
+                notify("GitHub에 로그인했어요", Page.Repos)
                 scanNow()
             }
         }
@@ -302,7 +312,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             problem = limitedUntil?.let(::limitMessage)
             // 한도가 풀리기 전에는 다시 확인하지 않는다
             if (limitedUntil != null) nextScanAt = maxOf(nextScanAt, limitedUntil + 5_000)
-            if (isNew && !autoMove) notify("옮길 저장소가 ${moves.size}개 있어요")
+            if (isNew && !autoMove) notify("옮길 저장소가 ${moves.size}개 있어요", Page.Repos)
         } catch (e: Exception) {
             log("스캔 실패: $e")
             problem = "폴더 확인 실패"
@@ -314,7 +324,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     /** 한도에 걸렸으면 초기화 시각을 돌려준다 */
     private suspend fun checkUpdate(): Long? = try {
         val latest = withContext(Dispatchers.IO) { Updater.latestNewer() }
-        if (latest != null && latest != update) notify("새 버전 ${latest.tag}을 설치할 수 있어요")
+        if (latest != null && latest != update) notify("새 버전 ${latest.tag}을 설치할 수 있어요", Page.Settings)
         update = latest
         null
     } catch (e: GitHubLimitException) {
@@ -363,7 +373,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             }
         pending = pending - movable.toSet()
         approved = approved - movable.map { it.dir }.toSet()
-        if (done.isNotEmpty()) notify("저장소 ${done.size}개를 옮겼어요")
+        if (done.isNotEmpty()) notify("저장소 ${done.size}개를 옮겼어요", Page.Repos)
     }
 
     private fun log(message: String) {

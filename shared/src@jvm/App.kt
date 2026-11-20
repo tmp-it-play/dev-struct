@@ -125,17 +125,12 @@ private val Dark =
         segmentThumb = Color(0x38FFFFFF),
     )
 
-private enum class Tab(val label: String) {
-    Repos("정리"),
-    Settings("설정"),
-}
-
 /** 메뉴바 팝오버 내용. 그림자는 macOS가 그린다. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit) {
     val p = if (isSystemInDarkTheme()) Dark else Light
-    var tab by remember { mutableStateOf(Tab.Repos) }
+    val tab = app.page
     val shape = RoundedCornerShape(16.dp)
 
     // Material 물결 효과(Switch 등)를 끈다
@@ -149,9 +144,9 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit) {
                     .background(p.window)
                     .border(0.5.dp, p.hairline, shape),
             ) {
-                Segmented(Tab.entries, tab, { it.label }, p, Modifier.padding(10.dp)) { tab = it }
+                Segmented(Page.entries, tab, { it.label }, p, Modifier.padding(10.dp)) { app.page = it }
                 // 정리 탭이 비어 있으면 스크롤 없이 안내를 세로 가운데에 둔다
-                val empty = tab == Tab.Repos && app.pending.isEmpty() && app.discovered.isEmpty()
+                val empty = tab == Page.Repos && app.pending.isEmpty() && app.discovered.isEmpty()
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -161,8 +156,8 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     when (tab) {
-                        Tab.Repos -> ReposTab(app, p, onClose)
-                        Tab.Settings -> SettingsTab(app, p, onClose)
+                        Page.Repos -> ReposTab(app, p, onClose)
+                        Page.Settings -> SettingsTab(app, p, onClose)
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -466,7 +461,7 @@ private fun openUrl(url: String) {
 }
 
 @Composable
-private fun Footer(app: DevStruct, p: Palette, tab: Tab, onQuit: () -> Unit) {
+private fun Footer(app: DevStruct, p: Palette, tab: Page, onQuit: () -> Unit) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -481,7 +476,7 @@ private fun Footer(app: DevStruct, p: Palette, tab: Tab, onQuit: () -> Unit) {
         // 상태는 한 번만: 확인 중이면 도는 아이콘만, 문제가 있으면 그 문제만 보여준다
         val problem = app.problem
         when {
-            tab == Tab.Settings -> Text("DevStruct $APP_VERSION", color = p.secondary, fontSize = 12.sp)
+            tab == Page.Settings -> Text("DevStruct $APP_VERSION", color = p.secondary, fontSize = 12.sp)
             problem != null ->
                 Text(
                     problem,
