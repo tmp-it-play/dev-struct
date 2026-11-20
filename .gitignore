@@ -1,0 +1,30 @@
+# Kotlin / Kotlin Toolchain
+*.iml
+.kotlin
+**/build/
+!src/**/build/
+
+# IDE
+.idea
+.fleet
+.vscode
+
+# OS
+.DS_Store
+
+# Local
+local.properties
+*.hprof
+captures
+
+# Claude Code local
+.claude/command.log
+.claude/settings.local.json
+
+# Xcode (iOS 타깃 추가 시)
+**/module.xcodeproj/*
+!**/module.xcodeproj/project.pbxproj
+!**/module.xcodeproj/xcshareddata/
+!**/module.xcodeproj/project.xcworkspace/
+**/xcshareddata/WorkspaceSettings.xcsettings
+xcuserdata
