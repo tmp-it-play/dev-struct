@@ -16,7 +16,9 @@ import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.delay
 import java.awt.BasicStroke
 import java.awt.Color
+import java.awt.Desktop
 import java.awt.GraphicsEnvironment
+import java.awt.MouseInfo
 import java.awt.Point
 import java.awt.RenderingHints
 import java.awt.SystemTray
@@ -105,14 +107,22 @@ fun main(args: Array<String>) {
             }
             LaunchedEffect(open, anchor) {
                 if (!open) return@LaunchedEffect
+                // 메뉴바 앱은 저절로 활성 앱이 되지 않아 포커스를 잃는 일도 없다. 활성화해야 다른 앱을 누를 때 닫힌다
+                runCatching { Desktop.getDesktop().requestForeground(true) }
                 window.toFront()
                 window.requestFocus()
-                // 열려 있는 동안 아이콘 위치를 따라간다. 창이 밀려나도 제자리로 되돌린다
                 while (true) {
+                    // 다른 메뉴바 앱처럼 팝오버 바깥을 누르면 닫는다(포커스 이벤트가 오지 않는 경우까지)
+                    if (GlobalMouse.pressed() && !window.bounds.contains(MouseInfo.getPointerInfo().location)) {
+                        open = false
+                        hiddenAt = System.currentTimeMillis()
+                        break
+                    }
+                    // 열려 있는 동안 아이콘 위치를 따라간다
                     val location = popoverLocation(trayIconLocation(trayIcon), anchor)
                     val target = WindowPosition(location.x.dp, location.y.dp)
                     if (windowState.position != target || window.location != location) windowState.position = target
-                    delay(250)
+                    delay(100)
                 }
             }
             Popover(app, onQuit = ::exitApplication) {
