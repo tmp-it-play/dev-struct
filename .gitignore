@@ -17,9 +17,10 @@ local.properties
 *.hprof
 captures
 
-# Claude Code local
+# LLM Code local
 .claude/command.log
 .claude/settings.local.json
+.codex/command.log
 
 # Xcode (iOS 타깃 추가 시)
 **/module.xcodeproj/*
