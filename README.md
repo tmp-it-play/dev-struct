@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="packaging/logo.png" width="256" alt="DevStruct logo">
+<img src="packaging/logo.png" width="128" alt="DevStruct logo">
 
 # DevStruct
 
@@ -8,10 +8,6 @@
 
 ![Language Stats](https://github-repository-language-graph-wi.vercel.app/api?username=tmp-it-play&repo=dev-struct)
 
-저장소 이름이 바뀌거나 소유권이 이전되면 폴더와 git remote를 맞춰줍니다.<br>
-fork는 `OpenSource` 폴더로 모읍니다.<br>
-원하면 홈 폴더 곳곳에 흩어진 저장소도 찾아서, 승인하면 한곳으로 가져옵니다.<br>
-IDE나 에디터가 켜져 있으면 기다렸다가 꺼지면 옮기고, 도구가 기억하는 프로젝트 경로도 함께 바꿉니다.
 
 ### 지원 도구
 
