@@ -59,14 +59,21 @@ object DevTools {
             }
         }.distinct()
 
-    /** 모든 도구가 기억하는 경로를 새 위치로 바꾼다. 원본은 .devstruct.bak로 남긴다. */
-    fun relink(from: Path, to: Path) {
-        textFiles().forEach { relinkText(it, from.toString(), to.toString()) }
-        sqliteFiles().forEach { relinkSqlite(it, from.toString(), to.toString()) }
-        runCatching { relinkClaudeProjects(from.toString(), to.toString()) }
+    /** 켜진 연동의 도구들이 기억하는 경로를 모두 새 위치로 바꾼다. 원본은 .devstruct.bak로 남긴다. */
+    fun relink(from: Path, to: Path, ides: Boolean, agents: Boolean) {
+        val (f, t) = from.toString() to to.toString()
+        if (ides) {
+            ideTextFiles().forEach { relinkText(it, f, t) }
+            ideSqliteFiles().forEach { relinkSqlite(it, f, t) }
+        }
+        if (agents) {
+            agentTextFiles().forEach { relinkText(it, f, t) }
+            agentSqliteFiles().forEach { relinkSqlite(it, f, t) }
+            runCatching { relinkClaudeProjects(f, t) }
+        }
     }
 
-    private fun textFiles(): List<Path> {
+    private fun ideTextFiles(): List<Path> {
         // JetBrains IDE(Android Studio는 Google 아래). Rider는 recentSolutions.xml을 쓴다
         val jetbrains =
             listOf("JetBrains", "Google")
@@ -93,21 +100,26 @@ object DevTools {
             listOf(config.resolve("herdr/session.json"), config.resolve("herdr-app/view.json")) +
                 config.resolve("herdr/sessions").children().map { it.resolve("session.json") } +
                 listOf("docs.json", "terminals.json").map { Path.of(home, ".local/state/herdr-core/default", it) }
-        // 에이전트 CLI: 프로젝트별 설정·신뢰 목록을 경로로 기억한다
-        val agents =
-            listOf(
-                Path.of(home, ".claude.json"),
-                Path.of(home, ".codex/config.toml"),
-                Path.of(home, ".copilot/config.json"),
-                Path.of(home, ".gemini/projects.json"),
-                Path.of(home, ".gemini/trustedFolders.json"),
-            )
-        return (jetbrains + vscode + paseo + herdr + agents).filter { it.isRegularFile() }
+        return (jetbrains + vscode + paseo + herdr).filter { it.isRegularFile() }
     }
 
-    private fun sqliteFiles(): List<Path> {
-        val vscode = vscodeUsers().map { it.resolve("globalStorage/state.vscdb") }
-        val orca = appSupport.resolve("Orca/profiles").children().map { it.resolve("profile-state.db") }
+    // 에이전트 CLI: 프로젝트별 설정·신뢰 목록을 경로로 기억한다
+    private fun agentTextFiles(): List<Path> = listOf(
+        ".claude.json",
+        ".codex/config.toml",
+        ".copilot/config.json",
+        ".gemini/projects.json",
+        ".gemini/trustedFolders.json",
+    )
+        .map { Path.of(home, it) }
+        .filter { it.isRegularFile() }
+
+    private fun ideSqliteFiles(): List<Path> = (
+        vscodeUsers().map { it.resolve("globalStorage/state.vscdb") } +
+            appSupport.resolve("Orca/profiles").children().map { it.resolve("profile-state.db") }
+        ).filter { it.isRegularFile() }
+
+    private fun agentSqliteFiles(): List<Path> {
         // Codex 스레드 목록(threads.cwd)
         val codex = Path.of(home, ".codex").children().filter {
             it.fileName.toString().matches(Regex("""state_\d+\.sqlite"""))
@@ -117,7 +129,7 @@ object DevTools {
         val hermes =
             listOf(hermesHome.resolve("state.db")) +
                 hermesHome.resolve("profiles").children().map { it.resolve("state.db") }
-        return (vscode + orca + codex + hermes).filter { it.isRegularFile() }
+        return (codex + hermes).filter { it.isRegularFile() }
     }
 
     /**

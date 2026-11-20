@@ -100,7 +100,7 @@ class Organizer(private val root: Path, private val log: (String) -> Unit) {
         }
         Files.createDirectories(plan.target.parent)
         Files.move(plan.dir, plan.target)
-        if (Settings.devTools) DevTools.relink(plan.dir, plan.target)
+        DevTools.relink(plan.dir, plan.target, ides = Settings.devTools, agents = Settings.agentTools)
         removeIfEmpty(plan.dir.parent)
         log("이동: ${root.relativize(plan.dir)} → ${root.relativize(plan.target)}")
         return true

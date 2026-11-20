@@ -22,10 +22,15 @@ object Settings {
         get() = prefs.getBoolean("autoMove", false)
         set(value) = prefs.putBoolean("autoMove", value)
 
-    /** 개발 도구가 켜져 있으면 이동을 미루고, 옮긴 뒤 도구들의 프로젝트 경로를 바꾼다(키는 예전 이름 유지) */
+    /** IDE·ADE가 켜져 있으면 이동을 미루고, 옮긴 뒤 그 도구들의 프로젝트 경로를 바꾼다(키는 예전 이름 유지) */
     var devTools: Boolean
         get() = prefs.getBoolean("jetbrains", true)
         set(value) = prefs.putBoolean("jetbrains", value)
+
+    /** 옮긴 뒤 에이전트 CLI(Claude Code, Codex 등)가 기억하는 경로를 바꾼다 */
+    var agentTools: Boolean
+        get() = prefs.getBoolean("agentTools", true)
+        set(value) = prefs.putBoolean("agentTools", value)
 
     /** 루트 밖 홈 폴더 전체에서도 저장소를 찾는다(기본은 꺼짐) */
     var discover: Boolean
