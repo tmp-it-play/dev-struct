@@ -8,7 +8,8 @@
     "allow": [
       "WebSearch",
       "WebFetch",
-      "Bash(./gradlew *)",
+      "Bash(./kotlin *)",
+      "Bash(ktlint *)",
       "Bash(git diff*)",
       "Bash(git status)",
       "Bash(git log*)",
