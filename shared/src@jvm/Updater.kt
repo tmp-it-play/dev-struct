@@ -42,12 +42,32 @@ object Updater {
         val dmg = tmp.resolve(release.asset)
         if (!runCatching { GitHub.download(release.url, dmg) }.getOrDefault(false)) return "다운로드 실패: ${release.url}"
         val mount = tmp.resolve("mnt")
+        // hdiutil attach는 deprecated. diskutil image가 없는 구버전 macOS에서만 hdiutil을 쓴다
         val attach =
-            runCommand("hdiutil", "attach", "-nobrowse", "-readonly", "-mountpoint", mount.toString(), dmg.toString())
+            runCommand(
+                "diskutil",
+                "image",
+                "attach",
+                "--readOnly",
+                "--nobrowse",
+                "--mountPoint",
+                mount.toString(),
+                dmg.toString(),
+            )
+                .takeIf { it.ok }
+                ?: runCommand(
+                    "hdiutil",
+                    "attach",
+                    "-nobrowse",
+                    "-readonly",
+                    "-mountpoint",
+                    mount.toString(),
+                    dmg.toString(),
+                )
         if (!attach.ok) return "dmg 열기 실패: ${attach.output}"
         val newApp = tmp.resolve("DevStruct.app")
         val copy = runCommand("ditto", mount.resolve("DevStruct.app").toString(), newApp.toString())
-        runCommand("hdiutil", "detach", mount.toString(), "-quiet")
+        runCommand("diskutil", "eject", mount.toString())
         if (!copy.ok || !newApp.isDirectory()) return "앱 복사 실패: ${copy.output}"
 
         // 종료를 기다렸다가 교체한다. 실패하면 기존 앱을 되돌린다
