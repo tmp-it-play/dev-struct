@@ -21,6 +21,11 @@ object Settings {
     var autoMove: Boolean
         get() = prefs.getBoolean("autoMove", false)
         set(value) = prefs.putBoolean("autoMove", value)
+
+    /** JetBrains IDE가 켜져 있으면 이동을 미루고, 옮긴 뒤 IDE의 프로젝트 경로를 바꾼다 */
+    var jetbrains: Boolean
+        get() = prefs.getBoolean("jetbrains", true)
+        set(value) = prefs.putBoolean("jetbrains", value)
 }
 
 /** 로그인 시 실행. .app 번들로 실행했을 때만 쓸 수 있다. */
