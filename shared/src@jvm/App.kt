@@ -375,7 +375,7 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
                     } else {
                         val underline = SpanStyle(textDecoration = TextDecoration.Underline)
                         val styles = TextLinkStyles(
-                            style = SpanStyle(color = p.accent, textDecoration = TextDecoration.None),
+                            style = SpanStyle(color = p.label, textDecoration = TextDecoration.None),
                             hoveredStyle = underline,
                             focusedStyle = underline,
                         )
