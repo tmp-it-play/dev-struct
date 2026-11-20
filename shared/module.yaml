@@ -6,6 +6,7 @@ dependencies:
   - $compose.runtime
   - $compose.foundation
   - $compose.material3
+  - $libs.compose.material.icons.core
   - $compose.ui
   - $compose.components.resources
   - $compose.preview

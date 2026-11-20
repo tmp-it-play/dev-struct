@@ -1,20 +1,20 @@
 package team.themoment.dev_struct
 
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.nio.file.Files
 import java.nio.file.Path
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
+import java.nio.file.StandardOpenOption.APPEND
+import java.nio.file.StandardOpenOption.CREATE
+import java.time.LocalDateTime
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -28,7 +28,11 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         private set
     var scanning by mutableStateOf(false)
         private set
-    var lastScan by mutableStateOf<String?>(null)
+    var nextScanAt by mutableStateOf(0L)
+        private set
+
+    /** 사용자가 알아야 할 문제만 담는다 */
+    var problem by mutableStateOf<String?>(null)
         private set
     var update by mutableStateOf<Release?>(null)
         private set
@@ -38,12 +42,10 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         private set
     var autoMove by mutableStateOf(Settings.autoMove)
         private set
-    val logs = mutableStateListOf<String>()
 
     private val scanRequest = Channel<Unit>(Channel.CONFLATED)
 
     fun start() = scope.launch {
-        var nextScanAt = 0L
         while (isActive) {
             if (System.currentTimeMillis() >= nextScanAt) {
                 scan()
@@ -58,22 +60,27 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     fun installUpdate() {
         val release = update ?: return
         scope.launch {
-            log("${release.tag} 업데이트를 내려받는 중…")
-            withContext(Dispatchers.IO) { Updater.install(release) }?.let(::log)
+            withContext(Dispatchers.IO) { Updater.install(release) }?.let {
+                log(it)
+                problem = "업데이트하지 못했어요"
+            }
         }
     }
 
     fun login() {
         scope.launch {
-            val code =
-                withContext(Dispatchers.IO) { GitHubAuth.requestCode() } ?: return@launch log("GitHub 로그인 코드를 받지 못했어요")
+            val code = withContext(Dispatchers.IO) { GitHubAuth.requestCode() }
+            if (code == null) {
+                problem = "GitHub에 연결하지 못했어요"
+                return@launch
+            }
             deviceCode = code
             runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(code.verificationUri)) }
             val error = withContext(Dispatchers.IO) { GitHubAuth.awaitToken(code) }
             deviceCode = null
             loggedIn = GitHubAuth.token() != null
-            log(error ?: "GitHub 로그인 완료")
-            if (error == null) scanNow()
+            error?.let(::log)
+            if (loggedIn) scanNow()
         }
     }
 
@@ -111,15 +118,18 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             val isNew = moves.any { m -> pending.none { it.dir == m.dir } }
             pending = moves
             approved = approved.filterTo(mutableSetOf()) { dir -> moves.any { it.dir == dir } }
-            lastScan = LocalTime.now().format(TIME)
             log("스캔 완료: 레포 ${plans.size}개, 이동 필요 ${moves.size}개")
             val latest = withContext(Dispatchers.IO) { Updater.latestNewer() }
-            if (latest != null && latest != update) notify("새 버전 ${latest.tag}이 나왔어요")
+            if (latest != null && latest != update) notify("새 버전 ${latest.tag}을 설치할 수 있어요")
             update = latest
             loggedIn = GitHubAuth.token() != null
-            if (isNew && !autoMove) notify("이동 승인이 필요한 레포가 ${moves.size}개 있어요")
+            problem = null
+            if (isNew && !autoMove) notify("옮길 레포가 ${moves.size}개 있어요")
+        } catch (e: GitHubLimitException) {
+            problem = if (loggedIn) "GitHub 요청 한도를 넘었어요. 잠시 후 다시 확인해요" else "GitHub 요청 한도를 넘었어요. 로그인하면 해결돼요"
         } catch (e: Exception) {
-            log("스캔 실패: ${e.message}")
+            log("스캔 실패: $e")
+            problem = "폴더를 확인하지 못했어요"
         } finally {
             scanning = false
         }
@@ -128,35 +138,29 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     private suspend fun processMoves() {
         val ready = pending.filter { autoMove || it.dir in approved }
         if (ready.isEmpty()) return
-        val ides = withContext(Dispatchers.IO) { JetBrains.runningIdes() }
-        if (ides.isNotEmpty() && blockingIdes.isEmpty()) notify("${ides.joinToString()} 종료 후 ${ready.size}개 레포를 이동해요")
-        blockingIdes = ides
-        if (ides.isNotEmpty()) return
+        blockingIdes = withContext(Dispatchers.IO) { JetBrains.runningIdes() }
+        if (blockingIdes.isNotEmpty()) return
 
         val organizer = Organizer(Path.of(Settings.root), ::log)
         val done =
             ready.filter { plan ->
                 withContext(Dispatchers.IO) {
                     runCatching { organizer.move(plan) }.getOrElse {
-                        log("이동 실패: ${plan.dir} (${it.message})")
+                        log("이동 실패: ${plan.dir} ($it)")
                         false
                     }
                 }
             }
         pending = pending - ready.toSet()
         approved = approved - ready.map { it.dir }.toSet()
-        if (done.isNotEmpty()) notify("${done.size}개 레포를 이동했어요")
+        if (done.isNotEmpty()) notify("레포 ${done.size}개를 옮겼어요")
     }
 
-    // Organizer는 IO 스레드에서도 로그를 남기므로 Main으로 넘긴다
     private fun log(message: String) {
-        scope.launch {
-            logs.add(0, "[${LocalTime.now().format(TIME)}] $message")
-            if (logs.size > 300) logs.removeRange(300, logs.size)
-        }
+        runCatching { Files.writeString(LOG_FILE, "${LocalDateTime.now()} $message\n", CREATE, APPEND) }
     }
 
     private companion object {
-        val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+        val LOG_FILE: Path = Path.of(System.getProperty("user.home"), "Library/Logs/DevStruct.log")
     }
 }
