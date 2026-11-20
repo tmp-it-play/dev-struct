@@ -9,7 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,7 +51,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
@@ -125,7 +123,7 @@ private enum class Tab(val label: String) {
     Settings("설정"),
 }
 
-/** 메뉴바 팝오버 내용. 바깥 여백은 그림자 자리다. */
+/** 메뉴바 팝오버 내용. 그림자는 macOS가 그린다. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Popover(app: DevStruct, onQuit: () -> Unit, onHeightChange: (Dp) -> Unit) {
@@ -136,13 +134,12 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onHeightChange: (Dp) -> Unit) {
 
     // Material 물결 효과(Switch 등)를 끈다
     CompositionLocalProvider(LocalRippleConfiguration provides null) {
-        Box(Modifier.fillMaxSize().padding(10.dp)) {
+        Box(Modifier.fillMaxSize()) {
             // 창 높이를 내용에 맞추도록 실제 높이를 알려준다
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .onSizeChanged { with(density) { onHeightChange(it.height.toDp() + 20.dp) } }
-                    .shadow(20.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
+                    .onSizeChanged { with(density) { onHeightChange(it.height.toDp()) } }
                     .clip(shape)
                     .background(p.window)
                     .border(0.5.dp, p.hairline, shape),
@@ -227,7 +224,8 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette) {
     app.pending.forEach { plan ->
         val from = root.relativize(plan.dir)
         val to = root.relativize(plan.target)
-        val detail = if (from.parent == to.parent) "${from.name}에서 이름 변경" else "${from.parent} → ${to.parent}"
+        val detail =
+            if (from.parent == to.parent) "${from.name}에서 이름 변경" else "${from.parent ?: "루트 폴더"} → ${to.parent}"
         ItemRow(Icons.Filled.ArrowForward, plan.repo.ref.name, detail, p) {
             if (app.autoMove || plan.dir in app.approved) {
                 Text("대기 중", color = p.secondary, fontSize = 11.sp)
@@ -474,12 +472,11 @@ private fun CircleButton(
     }
 }
 
-/** macOS처럼 물결·사각 강조 없이 누르는 동안만 살짝 흐려진다 */
+/** macOS처럼 누를 때 물결·강조·깜빡임이 없다 */
 @Composable
 private fun Modifier.pressable(onClick: () -> Unit): Modifier {
     val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    return alpha(if (pressed) 0.5f else 1f).clickable(source, indication = null, onClick = onClick)
+    return clickable(source, indication = null, onClick = onClick)
 }
 
 @Composable
