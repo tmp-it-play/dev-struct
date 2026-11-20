@@ -1,7 +1,6 @@
 package team.themoment.dev_struct
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -131,4 +130,4 @@ object GitHub {
 
 class GitHubLimitException(val resetAt: Long) : Exception("GitHub 요청 한도를 다 썼어요")
 
-fun JsonObject.string(key: String): String = (get(key) as JsonElement?)?.jsonPrimitive?.content.orEmpty()
+fun JsonObject.string(key: String): String = this[key]?.jsonPrimitive?.content.orEmpty()

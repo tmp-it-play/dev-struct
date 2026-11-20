@@ -32,11 +32,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -246,7 +246,7 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
                     from.parent == to.parent -> "${from.name}에서 이름 변경"
                     else -> "${from.parent ?: "루트 폴더"} → ${to.parent}"
                 }
-            ItemRow(Icons.Filled.ArrowForward, plan.repo.ref.name, detail, p) {
+            ItemRow(Icons.AutoMirrored.Filled.ArrowForward, plan.repo.ref.name, detail, p) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -464,7 +464,7 @@ private val NOTICES =
 @Composable
 private fun ColumnScope.Notices(p: Palette, onBack: () -> Unit) {
     Row(Modifier.padding(top = 8.dp).pressable(onBack), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.KeyboardArrowLeft, null, tint = p.accent, modifier = Modifier.size(18.dp))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = p.accent, modifier = Modifier.size(18.dp))
         Text("설정", color = p.accent, fontSize = 12.sp)
     }
     SectionTitle("오픈소스 고지", p)
@@ -479,7 +479,12 @@ private fun ColumnScope.Notices(p: Palette, onBack: () -> Unit) {
                     Text(name, color = p.label, fontSize = 13.sp)
                     Text(license, color = p.secondary, fontSize = 11.sp)
                 }
-                Icon(Icons.Filled.KeyboardArrowRight, null, tint = p.tertiary, modifier = Modifier.size(16.dp))
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    null,
+                    tint = p.tertiary,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
     }
@@ -492,7 +497,7 @@ private fun LinkRow(label: String, p: Palette, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, color = p.label, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        Icon(Icons.Filled.KeyboardArrowRight, null, tint = p.tertiary, modifier = Modifier.size(16.dp))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = p.tertiary, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -760,7 +765,7 @@ private fun PinnedSection(app: DevStruct, p: Palette) {
         ) {
             Text("고정된 저장소 ${rows.size}개", color = p.label, fontSize = 13.sp, modifier = Modifier.weight(1f))
             Icon(
-                if (expanded) Icons.Filled.KeyboardArrowDown else Icons.Filled.KeyboardArrowRight,
+                if (expanded) Icons.Filled.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 null,
                 tint = p.tertiary,
                 modifier = Modifier.size(16.dp),
