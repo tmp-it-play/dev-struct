@@ -27,9 +27,9 @@ object Settings {
         get() = prefs.getBoolean("jetbrains", true)
         set(value) = prefs.putBoolean("jetbrains", value)
 
-    /** 루트 밖 홈 폴더 전체에서도 저장소를 찾는다 */
+    /** 루트 밖 홈 폴더 전체에서도 저장소를 찾는다(기본은 꺼짐) */
     var discover: Boolean
-        get() = prefs.getBoolean("discover", true)
+        get() = prefs.getBoolean("discover", false)
         set(value) = prefs.putBoolean("discover", value)
 }
 
