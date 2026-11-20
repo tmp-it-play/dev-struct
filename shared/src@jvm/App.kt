@@ -97,11 +97,30 @@ private fun StatusSection(app: DevStruct) {
         Text("v$APP_VERSION")
         app.update?.let { OutlinedButton(onClick = app::installUpdate) { Text("${it.tag}로 업데이트") } }
     }
+    GitHubSection(app)
     if (app.blockingIdes.isNotEmpty()) {
         Text(
             "${app.blockingIdes.joinToString()} 실행 중이라 이동을 미뤘어요. 종료하면 자동으로 진행해요.",
             color = MaterialTheme.colorScheme.error,
         )
+    }
+}
+
+@Composable
+private fun GitHubSection(app: DevStruct) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        val code = app.deviceCode
+        when {
+            code != null -> Text("브라우저에서 코드 ${code.userCode} 를 입력하세요 (${code.verificationUri})")
+            app.loggedIn -> {
+                Text("GitHub 로그인됨")
+                OutlinedButton(onClick = app::logout) { Text("로그아웃") }
+            }
+            else -> {
+                Text("GitHub 로그인 안 됨 (공개 레포만, 시간당 60회)")
+                Button(enabled = GitHubAuth.configured, onClick = app::login) { Text("GitHub 로그인") }
+            }
+        }
     }
 }
 
