@@ -1,5 +1,5 @@
 #!/bin/sh
-# DevStruct.app(런타임 포함)을 만들고 zip으로 묶는다. 사용: packaging/package-macos.sh [버전]
+# DevStruct.app(런타임 포함)을 만들고 dmg로 묶는다. 사용: packaging/package-macos.sh [버전]
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -21,5 +21,10 @@ cp build/tasks/_desktopApp_executableJarJvm/desktopApp-jvm-executable.jar dist/i
 plutil -insert LSUIElement -bool true dist/DevStruct.app/Contents/Info.plist
 codesign --force --deep --sign - dist/DevStruct.app
 
-ditto -c -k --keepParent dist/DevStruct.app "dist/DevStruct-$version-macos-arm64.zip"
-echo "dist/DevStruct-$version-macos-arm64.zip"
+# 응용 프로그램 폴더 바로가기를 넣어 끌어다 놓기로 설치하게 한다
+mkdir dist/dmg
+ditto dist/DevStruct.app dist/dmg/DevStruct.app
+ln -s /Applications dist/dmg/Applications
+dmg="dist/DevStruct-$version-macos-arm64.dmg"
+hdiutil create -volname DevStruct -srcfolder dist/dmg -ov -format UDZO "$dmg"
+echo "$dmg"

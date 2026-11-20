@@ -30,7 +30,7 @@ object Updater {
             json["assets"]
                 ?.jsonArray
                 ?.map { it.jsonObject }
-                ?.firstOrNull { it.string("name").endsWith(".zip") } ?: return null
+                ?.firstOrNull { it.string("name").endsWith(".dmg") } ?: return null
         return Release(tag, asset.string("name"), asset.string("browser_download_url")).takeIf {
             isNewer(tag, APP_VERSION)
         }
@@ -39,11 +39,16 @@ object Updater {
     fun install(release: Release): String? {
         val bundle = appBundle ?: return "앱 번들(.app)로 실행할 때만 업데이트할 수 있어요"
         val tmp = Files.createTempDirectory("devstruct-update")
-        val zip = tmp.resolve(release.asset)
-        if (!runCatching { GitHub.download(release.url, zip) }.getOrDefault(false)) return "다운로드 실패: ${release.url}"
-        val unzip = runCommand("ditto", "-x", "-k", zip.toString(), tmp.toString())
+        val dmg = tmp.resolve(release.asset)
+        if (!runCatching { GitHub.download(release.url, dmg) }.getOrDefault(false)) return "다운로드 실패: ${release.url}"
+        val mount = tmp.resolve("mnt")
+        val attach =
+            runCommand("hdiutil", "attach", "-nobrowse", "-readonly", "-mountpoint", mount.toString(), dmg.toString())
+        if (!attach.ok) return "dmg 열기 실패: ${attach.output}"
         val newApp = tmp.resolve("DevStruct.app")
-        if (!unzip.ok || !newApp.isDirectory()) return "압축 해제 실패: ${unzip.output}"
+        val copy = runCommand("ditto", mount.resolve("DevStruct.app").toString(), newApp.toString())
+        runCommand("hdiutil", "detach", mount.toString(), "-quiet")
+        if (!copy.ok || !newApp.isDirectory()) return "앱 복사 실패: ${copy.output}"
 
         // 종료를 기다렸다가 교체한다. 실패하면 기존 앱을 되돌린다
         val pid = ProcessHandle.current().pid()
