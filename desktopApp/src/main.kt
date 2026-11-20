@@ -20,6 +20,8 @@ import java.awt.AlphaComposite
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Desktop
+import java.awt.FileDialog
+import java.awt.Frame
 import java.awt.GraphicsEnvironment
 import java.awt.MouseInfo
 import java.awt.Point
@@ -36,6 +38,7 @@ import java.awt.geom.Ellipse2D
 import java.awt.geom.Line2D
 import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
+import java.io.File
 import java.nio.file.Path
 import kotlin.system.exitProcess
 
@@ -59,6 +62,7 @@ fun main(args: Array<String>) {
         var hiddenAt by remember { mutableStateOf(0L) }
         // 열면서 앱을 활성화하는 동안 포커스가 잠깐 오가므로, 직후의 닫기 신호는 무시한다
         var openedAt by remember { mutableStateOf(0L) }
+        var choosingFolder by remember { mutableStateOf(false) }
         val justOpened = { System.currentTimeMillis() - openedAt < 500 }
         val trayIcon = remember { TrayIcon(trayImage(), "DevStruct").apply { isImageAutoSize = true } }
         var notificationOpens by remember { mutableIntStateOf(0) }
@@ -92,7 +96,7 @@ fun main(args: Array<String>) {
                 object : MouseAdapter() {
                     override fun mouseReleased(e: MouseEvent) {
                         // 열린 팝오버 밖(아이콘)을 누르면 포커스를 잃어 먼저 닫히므로 곧바로 다시 열지 않는다
-                        if (System.currentTimeMillis() - hiddenAt < 300) return
+                        if (choosingFolder || System.currentTimeMillis() - hiddenAt < 300) return
                         anchor = e.locationOnScreen
                         open = !open
                     }
@@ -117,7 +121,7 @@ fun main(args: Array<String>) {
                 val listener =
                     object : WindowAdapter() {
                         override fun windowLostFocus(e: WindowEvent) {
-                            if (justOpened()) return
+                            if (choosingFolder || justOpened()) return
                             open = false
                             hiddenAt = System.currentTimeMillis()
                         }
@@ -131,8 +135,8 @@ fun main(args: Array<String>) {
                 window.rootPane.putClientProperty("Window.shadow", true)
                 onDispose {}
             }
-            LaunchedEffect(open, anchor, notificationOpens) {
-                if (!open) return@LaunchedEffect
+            LaunchedEffect(open, anchor, notificationOpens, choosingFolder) {
+                if (!open || choosingFolder) return@LaunchedEffect
                 openedAt = System.currentTimeMillis()
                 // 메뉴바 앱은 저절로 활성 앱이 되지 않아 포커스를 잃는 일도 없다. 활성화해야 다른 앱을 누를 때 닫힌다
                 runCatching { Desktop.getDesktop().requestForeground(true) }
@@ -145,7 +149,7 @@ fun main(args: Array<String>) {
                 var placed: Point? = null
                 while (true) {
                     // 다른 메뉴바 앱처럼 팝오버 바깥을 누르면 닫는다(포커스 이벤트가 오지 않는 경우까지)
-                    if (!justOpened() && GlobalMouse.pressed() &&
+                    if (!choosingFolder && !justOpened() && GlobalMouse.pressed() &&
                         !window.bounds.contains(MouseInfo.getPointerInfo().location)
                     ) {
                         open = false
@@ -163,12 +167,39 @@ fun main(args: Array<String>) {
                 }
             }
             key(notificationOpens) {
-                Popover(app, onQuit = ::exitApplication, onClose = {
-                    open = false
-                    hiddenAt = System.currentTimeMillis()
-                })
+                Popover(
+                    app,
+                    onQuit = ::exitApplication,
+                    onClose = {
+                        open = false
+                        hiddenAt = System.currentTimeMillis()
+                    },
+                    chooseFolder = { current ->
+                        choosingFolder = true
+                        try {
+                            chooseFolder(window, current)
+                        } finally {
+                            openedAt = System.currentTimeMillis()
+                            choosingFolder = false
+                        }
+                    },
+                )
             }
         }
+    }
+}
+
+private fun chooseFolder(owner: Frame, current: String): String? {
+    val property = "apple.awt.fileDialogForDirectories"
+    val dialog = FileDialog(owner, "관리할 폴더 선택", FileDialog.LOAD)
+    val previous = System.setProperty(property, "true")
+    try {
+        dialog.directory = current
+        dialog.isVisible = true
+        return dialog.file?.let { File(dialog.directory, it).path }
+    } finally {
+        dialog.dispose()
+        if (previous == null) System.clearProperty(property) else System.setProperty(property, previous)
     }
 }
 

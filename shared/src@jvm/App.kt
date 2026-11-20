@@ -81,9 +81,6 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import java.awt.FileDialog
-import java.awt.Frame
-import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.name
 
@@ -135,7 +132,7 @@ private val Dark =
 /** 메뉴바 팝오버 내용. 그림자는 macOS가 그린다. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit) {
+fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit, chooseFolder: (String) -> String?) {
     val p = if (isSystemInDarkTheme()) Dark else Light
     val tab = app.page
     val shape = RoundedCornerShape(16.dp)
@@ -164,7 +161,7 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit) {
                 ) {
                     when (tab) {
                         Page.Repos -> ReposTab(app, p, onClose)
-                        Page.Settings -> SettingsTab(app, p, onClose)
+                        Page.Settings -> SettingsTab(app, p, onClose, chooseFolder)
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -279,7 +276,12 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
 }
 
 @Composable
-private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> Unit) {
+private fun ColumnScope.SettingsTab(
+    app: DevStruct,
+    p: Palette,
+    onClose: () -> Unit,
+    chooseFolder: (String) -> String?,
+) {
     var root by remember { mutableStateOf(Settings.root) }
     var interval by remember { mutableStateOf(Settings.intervalMinutes) }
     var loginItem by remember { mutableStateOf(LoginItem.enabled) }
@@ -853,13 +855,4 @@ private fun MacSwitch(checked: Boolean, p: Palette, enabled: Boolean = true, onC
         thumbContent = {},
         modifier = Modifier.scale(0.62f).height(24.dp),
     )
-}
-
-/** macOS 기본 폴더 선택 창 */
-private fun chooseFolder(current: String): String? {
-    System.setProperty("apple.awt.fileDialogForDirectories", "true")
-    val dialog = FileDialog(null as Frame?, "관리할 폴더 선택", FileDialog.LOAD).apply { directory = current }
-    dialog.isVisible = true
-    System.setProperty("apple.awt.fileDialogForDirectories", "false")
-    return dialog.file?.let { File(dialog.directory, it).path }
 }
