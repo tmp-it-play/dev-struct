@@ -28,7 +28,7 @@ object GitHubAuth {
         ?.also { cached = it }
 
     fun requestCode(): DeviceCode? {
-        // 비공개 레포 메타데이터를 읽으려면 OAuth App은 repo 스코프가 필요하다
+        // 비공개 저장소 메타데이터를 읽으려면 OAuth App은 repo 스코프가 필요하다
         val json = runCatching {
             GitHub.postForm(
                 "https://github.com/login/device/code",

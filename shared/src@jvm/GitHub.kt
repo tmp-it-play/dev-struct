@@ -15,9 +15,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 data class GitHubRepo(val id: Long, val ref: RepoRef, val fork: Boolean)
 
-/** GitHub REST API. 로그인하지 않으면 공개 레포만, 시간당 60회까지 조회된다. */
+/** GitHub REST API. 로그인하지 않으면 공개 저장소만, 시간당 60회까지 조회된다. */
 object GitHub {
-    // 이전/이름 변경된 레포는 301로 응답하므로 리다이렉트를 따라가 새 full_name을 받는다
+    // 이전/이름 변경된 저장소는 301로 응답하므로 리다이렉트를 따라가 새 full_name을 받는다
     private val http =
         HttpClient
             .newBuilder()
@@ -37,7 +37,7 @@ object GitHub {
 
     private val etagCache = ConcurrentHashMap<String, Pair<String, String>>()
 
-    // 비공개(비로그인)·삭제된 레포는 매번 묻지 않는다. 404도 한도를 쓴다
+    // 비공개(비로그인)·삭제된 저장소는 매번 묻지 않는다. 404도 한도를 쓴다
     private val notFoundUntil = ConcurrentHashMap<String, Long>()
     private const val NOT_FOUND_TTL = 6 * 60 * 60 * 1000L
 
@@ -45,7 +45,7 @@ object GitHub {
     @Volatile var limitedUntil = 0L
         private set
 
-    /** 로그인/로그아웃하면 볼 수 있는 레포가 달라지므로 기억한 결과를 버린다 */
+    /** 로그인/로그아웃하면 볼 수 있는 저장소가 달라지므로 기억한 결과를 버린다 */
     fun clearCache() {
         etagCache.clear()
         notFoundUntil.clear()
