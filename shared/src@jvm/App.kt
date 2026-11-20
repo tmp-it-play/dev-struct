@@ -1,6 +1,7 @@
 package team.themoment.dev_struct
 
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -14,6 +15,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -564,25 +567,36 @@ private fun <T> Segmented(
     fontSize: TextUnit = 12.sp,
     onSelect: (T) -> Unit,
 ) {
-    Row(modifier.fillMaxWidth().clip(CircleShape).background(p.segmentTrack).padding(2.dp)) {
-        options.forEach { option ->
-            val isSelected = option == selected
-            Box(
-                Modifier
-                    .weight(1f)
-                    .then(if (isSelected) Modifier.shadow(1.dp, CircleShape) else Modifier)
-                    .clip(CircleShape)
-                    .background(if (isSelected) p.segmentThumb else Color.Transparent)
-                    .pressable { onSelect(option) }
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    label(option),
-                    color = if (isSelected) p.label else p.secondary,
-                    fontSize = fontSize,
-                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+    BoxWithConstraints(modifier.fillMaxWidth().clip(CircleShape).background(p.segmentTrack).padding(2.dp)) {
+        val index = options.indexOf(selected)
+        if (index >= 0) {
+            val segmentWidth = maxWidth / options.size
+            val offset by animateDpAsState(segmentWidth * index, tween(180))
+            Box(Modifier.matchParentSize()) {
+                Spacer(
+                    Modifier
+                        .offset(x = offset)
+                        .width(segmentWidth)
+                        .fillMaxHeight()
+                        .shadow(1.dp, CircleShape)
+                        .background(p.segmentThumb, CircleShape),
                 )
+            }
+        }
+        Row(Modifier.fillMaxWidth()) {
+            options.forEach { option ->
+                val isSelected = option == selected
+                Box(
+                    Modifier.weight(1f).clip(CircleShape).pressable { onSelect(option) }.padding(vertical = 4.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label(option),
+                        color = if (isSelected) p.label else p.secondary,
+                        fontSize = fontSize,
+                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                    )
+                }
             }
         }
     }
