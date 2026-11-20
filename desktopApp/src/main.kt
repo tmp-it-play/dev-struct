@@ -33,7 +33,7 @@ import kotlin.system.exitProcess
 
 // 팝오버 크기
 private const val WIDTH = 340
-private const val MAX_HEIGHT = 620
+private const val MAX_HEIGHT = 780
 
 fun main(args: Array<String>) {
     if ("--dry-run" in args) dryRun()

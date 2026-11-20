@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,9 +34,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalRippleConfiguration
@@ -150,7 +156,7 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onHeightChange: (Dp) -> Unit) {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 140.dp, max = 440.dp)
+                        .heightIn(min = 400.dp, max = 640.dp)
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -243,6 +249,13 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette) {
     var root by remember { mutableStateOf(Settings.root) }
     var interval by remember { mutableStateOf(Settings.intervalMinutes) }
     var loginItem by remember { mutableStateOf(LoginItem.enabled) }
+    var jetbrains by remember { mutableStateOf(Settings.jetbrains) }
+    var showNotices by remember { mutableStateOf(false) }
+
+    if (showNotices) {
+        Notices(p) { showNotices = false }
+        return
+    }
 
     SectionTitle("폴더", p)
     Group(p) {
@@ -266,16 +279,7 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette) {
         }
         Hairline(p)
         SettingRow("확인 주기", p) {
-            val options = listOf(15, 30, 60, 180)
-            Segmented(options, interval, {
-                if (it <
-                    60
-                ) {
-                    "${it}분"
-                } else {
-                    "${it / 60}시간"
-                }
-            }, p, Modifier.width(196.dp), fontSize = 11.sp) {
+            Segmented(listOf(15, 30, 60, 180), interval, ::intervalLabel, p, Modifier.width(196.dp), fontSize = 11.sp) {
                 interval = it
                 Settings.intervalMinutes = it
             }
@@ -284,7 +288,21 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette) {
 
     SectionTitle("동작", p)
     Group(p) {
-        SettingRow("자동으로 옮기기", p) { MacSwitch(app.autoMove, p, onChange = app::updateAutoMove) }
+        SettingRow("자동으로 옮기기", p, info = "켜면 옮길 레포를 찾는 즉시 옮겨요. 끄면 정리 탭에서 승인한 레포만 옮겨요.") {
+            MacSwitch(app.autoMove, p, onChange = app::updateAutoMove)
+        }
+        Hairline(p)
+        SettingRow(
+            "JetBrains IDE 연동",
+            p,
+            info = "IntelliJ IDEA 같은 JetBrains IDE가 켜져 있으면 끌 때까지 기다렸다가 옮기고, 옮긴 뒤 IDE의 최근 프로젝트 경로도 바꿔요.",
+        ) {
+            MacSwitch(jetbrains, p) {
+                jetbrains = it
+                Settings.jetbrains = it
+                app.scanNow()
+            }
+        }
         Hairline(p)
         SettingRow("로그인 시 열기", p) {
             MacSwitch(loginItem, p, enabled = LoginItem.available) {
@@ -300,6 +318,72 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette) {
             if (app.loggedIn) Pill("로그아웃", p, app::logout) else Pill("로그인", p, app::login)
         }
     }
+
+    SectionTitle("정보", p)
+    Group(p) {
+        LinkRow("GitHub 저장소", p) { openUrl("https://github.com/tmp-it-play/dev-struct") }
+        Hairline(p)
+        LinkRow("라이선스 (Boost Software License 1.0)", p) {
+            openUrl("https://github.com/tmp-it-play/dev-struct/blob/master/LICENSE")
+        }
+        Hairline(p)
+        LinkRow("오픈소스 고지", p) { showNotices = true }
+    }
+}
+
+private fun intervalLabel(minutes: Int) = if (minutes < 60) "${minutes}분" else "${minutes / 60}시간"
+
+/** 앱에 함께 들어가는 오픈소스와 라이선스 */
+private val NOTICES =
+    listOf(
+        Triple("Kotlin", "Apache License 2.0", "https://github.com/JetBrains/kotlin"),
+        Triple("Compose Multiplatform", "Apache License 2.0", "https://github.com/JetBrains/compose-multiplatform"),
+        Triple("Skiko", "Apache License 2.0", "https://github.com/JetBrains/skiko"),
+        Triple("Material Icons", "Apache License 2.0", "https://github.com/google/material-design-icons"),
+        Triple("AndroidX Lifecycle", "Apache License 2.0", "https://github.com/JetBrains/compose-multiplatform-core"),
+        Triple("kotlinx.coroutines", "Apache License 2.0", "https://github.com/Kotlin/kotlinx.coroutines"),
+        Triple("kotlinx.serialization", "Apache License 2.0", "https://github.com/Kotlin/kotlinx.serialization"),
+        Triple("Logback", "EPL 1.0 / LGPL 2.1", "https://github.com/qos-ch/logback"),
+        Triple("OpenJDK (Eclipse Temurin)", "GPL 2.0 with Classpath Exception", "https://adoptium.net"),
+    )
+
+@Composable
+private fun ColumnScope.Notices(p: Palette, onBack: () -> Unit) {
+    Row(Modifier.padding(top = 8.dp).pressable(onBack), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Filled.KeyboardArrowLeft, null, tint = p.accent, modifier = Modifier.size(18.dp))
+        Text("설정", color = p.accent, fontSize = 12.sp)
+    }
+    SectionTitle("오픈소스 고지", p)
+    Group(p) {
+        NOTICES.forEachIndexed { i, (name, license, url) ->
+            if (i > 0) Hairline(p)
+            Row(
+                Modifier.fillMaxWidth().pressable { openUrl(url) }.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(name, color = p.label, fontSize = 13.sp)
+                    Text(license, color = p.secondary, fontSize = 11.sp)
+                }
+                Icon(Icons.Filled.KeyboardArrowRight, null, tint = p.tertiary, modifier = Modifier.size(16.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LinkRow(label: String, p: Palette, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(38.dp).pressable(onClick).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = p.label, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Icon(Icons.Filled.KeyboardArrowRight, null, tint = p.tertiary, modifier = Modifier.size(16.dp))
+    }
+}
+
+private fun openUrl(url: String) {
+    runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) }
 }
 
 @Composable
@@ -421,13 +505,36 @@ private fun Group(p: Palette, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(p.group), content = content)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SettingRow(label: String, p: Palette, trailing: @Composable RowScope.() -> Unit) {
+private fun SettingRow(label: String, p: Palette, info: String? = null, trailing: @Composable RowScope.() -> Unit) {
     Row(
         Modifier.fillMaxWidth().height(38.dp).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, color = p.label, fontSize = 13.sp)
+        info?.let {
+            Spacer(Modifier.width(4.dp))
+            TooltipArea(
+                tooltip = {
+                    Text(
+                        it,
+                        color = p.label,
+                        fontSize = 11.sp,
+                        modifier =
+                        Modifier
+                            .widthIn(max = 240.dp)
+                            .shadow(4.dp, RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(p.window)
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                    )
+                },
+                delayMillis = 300,
+            ) {
+                Icon(Icons.Outlined.Info, "설명", tint = p.tertiary, modifier = Modifier.size(14.dp))
+            }
+        }
         Spacer(Modifier.width(12.dp))
         Row(
             Modifier.weight(1f),
