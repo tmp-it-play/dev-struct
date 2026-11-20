@@ -15,7 +15,7 @@ JetBrains IDE가 켜져 있으면 기다렸다가 IDE가 꺼지면 옮기고, ID
 ## 설치
 
 [Releases](https://github.com/tmp-it-play/dev-struct/releases)에서 zip을 받아 `DevStruct.app`을 응용 프로그램 폴더로 옮기면 됩니다.<br>
-`gh` CLI에 로그인되어 있어야 하고, 새 버전은 앱에서 바로 업데이트할 수 있습니다.<br>
+앱에서 GitHub에 로그인하면 비공개 레포까지 관리하고, 새 버전도 앱에서 바로 업데이트할 수 있습니다.<br>
 서명되지 않은 앱이라 처음 한 번은 `xattr -dr com.apple.quarantine /Applications/DevStruct.app` 이 필요합니다.
 
 </div>
