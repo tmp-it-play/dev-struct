@@ -8,7 +8,7 @@ import kotlin.io.path.isDirectory
 import kotlin.system.exitProcess
 
 // CD가 태그(vX.Y.Z)와 이 값이 같은지 검사한다
-const val APP_VERSION = "1.0.5"
+const val APP_VERSION = "2.0.0"
 
 data class Release(val tag: String, val asset: String, val url: String)
 
