@@ -119,13 +119,13 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
                     return@launch
                 }
             if (plan == null) {
-                problem = "GitHub에서 ${found.ref.fullName}을(를) 찾지 못했어요"
+                problem = "GitHub에 ${found.ref.fullName}이(가) 없어요"
                 return@launch
             }
             discovered = discovered.filter { it.dir != found.dir }
             if (!plan.needsMove) return@launch
             pending = pending.filter { it.dir != plan.dir } + plan
-            approved = approved + plan.dir
+            approved = approved.plusElement(plan.dir)
             scanNow()
         }
     }
@@ -188,7 +188,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         scope.launch {
             val code = withContext(Dispatchers.IO) { GitHubAuth.requestCode() }
             if (code == null) {
-                problem = "GitHub에 연결하지 못했어요"
+                problem = "GitHub 연결 실패"
                 return@launch
             }
             deviceCode = code
@@ -248,7 +248,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         scope.launch {
             withContext(Dispatchers.IO) { Organizer(Path.of(Settings.root), ::log).setPinned(plan.dir, true) }
             pending = pending.filter { it.dir != plan.dir }
-            approved = approved - plan.dir
+            approved = approved.minusElement(plan.dir)
             pinned = (pinned + plan.copy(pinned = true)).sortedBy { it.dir }
         }
     }
@@ -262,7 +262,8 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     }
 
     fun approve(plan: RepoPlan) {
-        approved += plan.dir
+        // Path는 Iterable<Path>라 `+ path`가 경로 조각들을 더하므로 plusElement로 한 개만 더한다
+        approved = approved.plusElement(plan.dir)
         scanNow()
     }
 
@@ -292,7 +293,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
                 if (result.limitedUntil == null) {
                     moves + external
                 } else {
-                    pending.filter { it.dir !in scanned } + moves.filter { m -> pending.none { it.dir == m.dir } }
+                    pending.filter { it.dir !in scanned } + moves
                 }
             approved = approved.filterTo(mutableSetOf()) { dir -> pending.any { it.dir == dir } }
             log("스캔 완료: 저장소 ${plans.size}개, 이동 필요 ${moves.size}개")
@@ -304,7 +305,7 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             if (isNew && !autoMove) notify("옮길 저장소가 ${moves.size}개 있어요")
         } catch (e: Exception) {
             log("스캔 실패: $e")
-            problem = "폴더를 확인하지 못했어요"
+            problem = "폴더 확인 실패"
         } finally {
             scanning = false
         }
@@ -322,22 +323,25 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
 
     private fun limitMessage(resetAt: Long): String {
         val time = java.time.Instant.ofEpochMilli(resetAt).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
-        val at = "%d:%02d".format(time.hour, time.minute)
-        val base = "GitHub 요청 한도를 다 써서 $at 에 다시 확인해요"
-        return if (loggedIn) base else "$base · 로그인하면 한도가 늘어나요"
+        return "GitHub 요청 한도 초과 · %d:%02d에 다시 확인".format(time.hour, time.minute)
     }
 
     private suspend fun processMoves() {
         runningAgents =
             if (pending.isNotEmpty() &&
-                Settings.devTools
+                Settings.agentTools
             ) {
                 withContext(Dispatchers.IO) { DevTools.runningAgents() }
             } else {
                 emptyList()
             }
         val ready = pending.filter { autoMove || it.dir in approved }
-        if (ready.isEmpty()) return
+        if (ready.isEmpty()) {
+            // 기다릴 항목이 없으면 이전 대기 사유도 지운다
+            blockingIdes = emptyList()
+            busyRepos = emptySet()
+            return
+        }
         blockingIdes = if (Settings.devTools) withContext(Dispatchers.IO) { DevTools.running() } else emptyList()
         if (blockingIdes.isNotEmpty()) return
 
