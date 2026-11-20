@@ -4,7 +4,7 @@ import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
 
 // GitHub OAuth App(Device Flow 활성화)의 Client ID. 공개 값이라 코드에 둬도 된다
-const val GITHUB_CLIENT_ID = ""
+const val GITHUB_CLIENT_ID = "Ov23liKPaJuNeYyE3Ovf"
 
 data class DeviceCode(
     val userCode: String,
