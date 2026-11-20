@@ -9,17 +9,15 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-15 # Apple Silicon
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-
-      # 빌드 산출물이 Java 25 바이트코드라 jpackage도 25 이상이어야 한다
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "25"
 
-      - name: 태그와 APP_VERSION 일치 확인
+      - name: Verify tag matches APP_VERSION
         run: |
           version=$(sed -n 's/^const val APP_VERSION = "\(.*\)"/\1/p' shared/src@jvm/Updater.kt)
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
@@ -27,15 +25,15 @@ jobs:
             exit 1
           fi
 
-      - name: 테스트
+      - name: Test
         run: ./kotlin test
         env:
           KOTLIN_CLI_NO_WELCOME_BANNER: 1
 
-      - name: 패키징
+      - name: Package app
         run: packaging/package-macos.sh "${GITHUB_REF_NAME#v}"
 
-      - name: 릴리스 노트 드래프트 발행
+      - name: Publish draft release
         run: gh release create "$GITHUB_REF_NAME" dist/*.zip --draft --generate-notes --title "$GITHUB_REF_NAME"
         env:
           GH_TOKEN: ${{ github.token }}
