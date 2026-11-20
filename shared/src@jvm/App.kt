@@ -249,7 +249,7 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
                 ) {
                     Pill("고정", p, subtle = true) { app.pin(plan) }
                     if (app.autoMove || plan.dir in app.approved) {
-                        WaitingLabel(app, p)
+                        WaitingLabel(app, plan, p)
                     } else {
                         Pill("승인", p) { app.approve(plan) }
                     }
@@ -405,8 +405,9 @@ private const val DISCOVER_INFO =
         "숨김 폴더와 ~/Library는 건너뛰어요."
 
 private const val DEV_TOOLS_INFO =
-    "JetBrains IDE, Android Studio, VS Code, Cursor, Windsurf, Orca, Paseo, herdr, Air가 켜져 있으면 끌 때까지 기다렸다가 옮기고, " +
-        "옮긴 뒤 이 도구들이 기억하는 프로젝트 경로도 바꿔요."
+    "JetBrains IDE, Android Studio, VS Code·Cursor·Windsurf·Antigravity, Orca, Paseo, herdr, Air가 " +
+        "켜져 있으면 끌 때까지 기다렸다가 옮겨요. " +
+        "옮긴 뒤에는 이 도구들과 Claude Code, Codex, Copilot, Gemini, Hermes가 기억하는 프로젝트 경로도 바꿔요."
 
 private fun homeRelative(path: Path) = path.toString().replaceFirst(System.getProperty("user.home"), "~")
 
@@ -629,17 +630,22 @@ private fun Pill(label: String, p: Palette, subtle: Boolean = false, onClick: ()
 /** 승인했지만 아직 옮기지 않은 이유. IDE 때문이면 어떤 IDE인지 툴팁으로 알려준다 */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun WaitingLabel(app: DevStruct, p: Palette) {
-    if (app.blockingIdes.isEmpty()) {
+private fun WaitingLabel(app: DevStruct, plan: RepoPlan, p: Palette) {
+    val reason =
+        when {
+            app.blockingIdes.isNotEmpty() ->
+                "도구 종료 후" to
+                    "${app.blockingIdes.joinToString()}이(가) 켜져 있어 기다리고 있어요. 종료하면 바로 옮겨요."
+            plan.dir in app.busyRepos -> "사용 중" to "터미널이나 에이전트가 이 폴더에서 실행 중이에요. 끝나면 옮겨요."
+            else -> null
+        }
+    if (reason == null) {
         Text("곧 옮겨요", color = p.secondary, fontSize = 11.sp)
         return
     }
-    TooltipArea(
-        tooltip = { Tip("${app.blockingIdes.joinToString()}이(가) 켜져 있어 기다리고 있어요. 종료하면 바로 옮겨요.", p) },
-        delayMillis = 300,
-    ) {
+    TooltipArea(tooltip = { Tip(reason.second, p) }, delayMillis = 300) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("도구 종료 후", color = p.warning, fontSize = 11.sp)
+            Text(reason.first, color = p.warning, fontSize = 11.sp)
             Spacer(Modifier.width(3.dp))
             Icon(Icons.Outlined.Info, null, tint = p.warning, modifier = Modifier.size(12.dp))
         }

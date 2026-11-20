@@ -28,6 +28,10 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         private set
     var blockingIdes by mutableStateOf<List<String>>(emptyList())
         private set
+
+    /** 터미널·에이전트가 작업 폴더로 쓰고 있어 미룬 저장소 */
+    var busyRepos by mutableStateOf<Set<Path>>(emptySet())
+        private set
     var scanning by mutableStateOf(false)
         private set
     var nextScanAt by mutableStateOf(0L)
@@ -325,9 +329,15 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         blockingIdes = if (Settings.devTools) withContext(Dispatchers.IO) { DevTools.running() } else emptyList()
         if (blockingIdes.isNotEmpty()) return
 
+        // 저장소 안에서 실행 중인 프로세스가 있으면 그 저장소만 미룬다(CLI 에이전트는 늘 켜져 있어 전체를 막지 않는다)
+        val busy = withContext(Dispatchers.IO) { DevTools.busyDirs() }
+        busyRepos = ready.filter { plan -> busy.any { it.startsWith(plan.dir) } }.map { it.dir }.toSet()
+        val movable = ready.filter { it.dir !in busyRepos }
+        if (movable.isEmpty()) return
+
         val organizer = Organizer(Path.of(Settings.root), ::log)
         val done =
-            ready.filter { plan ->
+            movable.filter { plan ->
                 withContext(Dispatchers.IO) {
                     runCatching { organizer.move(plan) }.getOrElse {
                         log("이동 실패: ${plan.dir} ($it)")
@@ -335,8 +345,8 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
                     }
                 }
             }
-        pending = pending - ready.toSet()
-        approved = approved - ready.map { it.dir }.toSet()
+        pending = pending - movable.toSet()
+        approved = approved - movable.map { it.dir }.toSet()
         if (done.isNotEmpty()) notify("저장소 ${done.size}개를 옮겼어요")
     }
 

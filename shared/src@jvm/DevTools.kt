@@ -9,7 +9,7 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 /**
- * 프로젝트 경로를 기억하는 개발 도구(JetBrains IDE, Android Studio, VS Code·Cursor·Windsurf, Orca, Paseo, herdr, JetBrains Air).
+ * 프로젝트 경로를 기억하는 개발 도구(JetBrains IDE, Android Studio, VS Code 계열, Orca, Paseo, herdr, JetBrains Air, 에이전트 CLI).
  * 대부분 종료할 때 상태를 다시 쓰므로, 실행 중이면 이동을 미루고 모두 꺼진 뒤에만 경로를 바꾼다.
  */
 object DevTools {
@@ -31,6 +31,7 @@ object DevTools {
             // VS Code 기반 에디터
             "Cursor" to null,
             "Windsurf" to null,
+            "Antigravity" to null,
             "Orca" to "Orca",
             // 백그라운드 서버(Paseo Daemon)도 같은 실행 파일이다
             "Paseo" to "Paseo",
@@ -62,6 +63,7 @@ object DevTools {
     fun relink(from: Path, to: Path) {
         textFiles().forEach { relinkText(it, from.toString(), to.toString()) }
         sqliteFiles().forEach { relinkSqlite(it, from.toString(), to.toString()) }
+        runCatching { relinkClaudeProjects(from.toString(), to.toString()) }
     }
 
     private fun textFiles(): List<Path> {
@@ -91,13 +93,51 @@ object DevTools {
             listOf(config.resolve("herdr/session.json"), config.resolve("herdr-app/view.json")) +
                 config.resolve("herdr/sessions").children().map { it.resolve("session.json") } +
                 listOf("docs.json", "terminals.json").map { Path.of(home, ".local/state/herdr-core/default", it) }
-        return (jetbrains + vscode + paseo + herdr).filter { it.isRegularFile() }
+        // 에이전트 CLI: 프로젝트별 설정·신뢰 목록을 경로로 기억한다
+        val agents =
+            listOf(
+                Path.of(home, ".claude.json"),
+                Path.of(home, ".codex/config.toml"),
+                Path.of(home, ".copilot/config.json"),
+                Path.of(home, ".gemini/projects.json"),
+                Path.of(home, ".gemini/trustedFolders.json"),
+            )
+        return (jetbrains + vscode + paseo + herdr + agents).filter { it.isRegularFile() }
     }
 
-    private fun sqliteFiles(): List<Path> = (
-        vscodeUsers().map { it.resolve("globalStorage/state.vscdb") } +
-            appSupport.resolve("Orca/profiles").children().map { it.resolve("profile-state.db") }
-        ).filter { it.isRegularFile() }
+    private fun sqliteFiles(): List<Path> {
+        val vscode = vscodeUsers().map { it.resolve("globalStorage/state.vscdb") }
+        val orca = appSupport.resolve("Orca/profiles").children().map { it.resolve("profile-state.db") }
+        // Codex 스레드 목록(threads.cwd)
+        val codex = Path.of(home, ".codex").children().filter {
+            it.fileName.toString().matches(Regex("""state_\d+\.sqlite"""))
+        }
+        // Hermes Agent 세션(cwd). 프로필마다 state.db가 있다
+        val hermesHome = System.getenv("HERMES_HOME")?.let(Path::of) ?: Path.of(home, ".hermes")
+        val hermes =
+            listOf(hermesHome.resolve("state.db")) +
+                hermesHome.resolve("profiles").children().map { it.resolve("state.db") }
+        return (vscode + orca + codex + hermes).filter { it.isRegularFile() }
+    }
+
+    /**
+     * Claude Code는 대화 기록·메모리를 경로를 이름으로 바꾼 폴더(~/.claude/projects/-Users-...)에 둔다.
+     * 새 위치 이름의 폴더가 아직 없을 때만 옮긴다.
+     */
+    private fun relinkClaudeProjects(from: String, to: String) {
+        val projects = Path.of(home, ".claude/projects")
+        val encode = { path: String -> path.replace(Regex("[^A-Za-z0-9]"), "-") }
+        val old = projects.resolve(encode(from))
+        val new = projects.resolve(encode(to))
+        if (Files.isDirectory(old) && !Files.exists(new)) Files.move(old, new)
+    }
+
+    /** 이 폴더 안을 작업 폴더로 쓰는 프로세스(터미널, 에이전트 등)가 있는 경로들. 옮기면 그 프로세스가 망가진다 */
+    fun busyDirs(): List<Path> = runCommand("lsof", "-a", "-d", "cwd", "-Fn")
+        .output
+        .lines()
+        .filter { it.startsWith("n/") }
+        .map { Path.of(it.removePrefix("n")) }
 
     private fun relinkText(file: Path, from: String, to: String) {
         val text = file.readText()
@@ -138,7 +178,9 @@ object DevTools {
     }
 
     // VS Code와 그 기반 에디터(Cursor, Windsurf)는 설정 구조가 같다
-    private fun vscodeUsers() = listOf("Code", "Cursor", "Windsurf").map { appSupport.resolve("$it/User") }
+    private fun vscodeUsers() = listOf("Code", "Cursor", "Windsurf", "Antigravity").map {
+        appSupport.resolve("$it/User")
+    }
 
     private fun Path.children(): List<Path> = if (Files.isDirectory(this)) listDirectoryEntries() else emptyList()
 }
