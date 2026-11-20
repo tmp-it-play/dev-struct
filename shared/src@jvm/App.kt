@@ -404,13 +404,9 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
 
 private const val DISCOVER_INFO = "루트 밖 홈 폴더에서 저장소를 찾아요. 승인해야 가져와요. 숨김 폴더와 ~/Library는 빼요."
 
-private const val IDE_INFO =
-    "JetBrains IDE, Android Studio, VS Code, Cursor, Windsurf, Antigravity, Orca, Paseo, herdr, Air가 켜져 있으면 " +
-        "기다렸다가 옮기고, 이 도구들의 프로젝트 경로를 바꿔요."
+private const val IDE_INFO = "IDE·ADE가 켜져 있으면 끈 뒤에 옮기고, 프로젝트 경로를 바꿔요."
 
-private const val AGENT_INFO =
-    "Claude Code, Codex, Copilot, Gemini, Hermes의 프로젝트 경로를 바꿔요. " +
-        "세션이 실행 중이면 바뀐 경로를 도구가 덮어쓸 수 있어요."
+private const val AGENT_INFO = "에이전트 도구의 프로젝트 경로를 바꿔요. 세션이 실행 중이면 덮어써질 수 있어요."
 
 private fun homeRelative(path: Path) = path.toString().replaceFirst(System.getProperty("user.home"), "~")
 
