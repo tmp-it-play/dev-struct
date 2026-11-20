@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalRippleConfiguration
@@ -201,7 +202,11 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(Icons.Filled.CheckCircle, null, tint = p.tertiary, modifier = Modifier.size(40.dp))
+            if (app.scanning) {
+                CircularProgressIndicator(modifier = Modifier.size(40.dp), color = p.accent, strokeWidth = 3.dp)
+            } else {
+                Icon(Icons.Filled.CheckCircle, null, tint = p.tertiary, modifier = Modifier.size(40.dp))
+            }
             Spacer(Modifier.height(10.dp))
             Text(if (app.scanning) "확인하는 중" else "모두 정리돼 있어요", color = p.secondary, fontSize = 13.sp)
         }
