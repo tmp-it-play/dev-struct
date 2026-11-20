@@ -19,10 +19,10 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,12 +66,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -135,20 +132,18 @@ private enum class Tab(val label: String) {
 /** 메뉴바 팝오버 내용. 그림자는 macOS가 그린다. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit, onHeightChange: (Dp) -> Unit) {
+fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit) {
     val p = if (isSystemInDarkTheme()) Dark else Light
     var tab by remember { mutableStateOf(Tab.Repos) }
     val shape = RoundedCornerShape(16.dp)
-    val density = LocalDensity.current
 
     // Material 물결 효과(Switch 등)를 끈다
     CompositionLocalProvider(LocalRippleConfiguration provides null) {
         Box(Modifier.fillMaxSize()) {
-            // 창 높이를 내용에 맞추도록 실제 높이를 알려준다
+            // 창 높이는 고정이고, 넘치는 내용만 가운데 영역에서 스크롤된다
             Column(
                 Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged { with(density) { onHeightChange(it.height.toDp()) } }
+                    .fillMaxSize()
                     .clip(shape)
                     .background(p.window)
                     .border(0.5.dp, p.hairline, shape),
@@ -157,7 +152,7 @@ fun Popover(app: DevStruct, onQuit: () -> Unit, onClose: () -> Unit, onHeightCha
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 400.dp, max = 720.dp)
+                        .weight(1f)
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -340,6 +335,7 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
         SettingRow("버전 $APP_VERSION", p) {
             val update = app.update
             when {
+                app.updateProgress != null -> ProgressPill(app.updateProgress!!, p)
                 update != null -> Pill("${update.tag} 설치", p, onClick = app::installUpdate)
                 app.checkingUpdate -> Text("확인하는 중…", color = p.secondary, fontSize = 12.sp)
                 else -> Pill("업데이트 확인", p, onClick = app::checkForUpdate)
@@ -619,6 +615,26 @@ private fun Tip(text: String, p: Palette) {
             .background(p.window)
             .padding(horizontal = 10.dp, vertical = 7.dp),
     )
+}
+
+/** 설치 버튼이 진행률만큼 왼쪽부터 채워진다. 채워지기 전에도 옅은 바탕색은 있다 */
+@Composable
+private fun ProgressPill(progress: Float, p: Palette) {
+    Box(
+        Modifier
+            .width(88.dp)
+            .height(22.dp)
+            .clip(CircleShape)
+            .background(p.accent.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier.align(
+                Alignment.CenterStart,
+            ).fillMaxHeight().fillMaxWidth(progress.coerceIn(0f, 1f)).background(p.accent.copy(alpha = 0.38f)),
+        )
+        Text("${(progress * 100).toInt()}%", color = p.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
 }
 
 /** 고정된 저장소 목록. 기본은 접혀 있다 */

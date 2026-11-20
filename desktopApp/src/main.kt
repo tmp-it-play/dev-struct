@@ -39,7 +39,7 @@ import kotlin.system.exitProcess
 
 // 팝오버 크기
 private const val WIDTH = 340
-private const val MAX_HEIGHT = 860
+private const val HEIGHT = 640
 
 fun main(args: Array<String>) {
     if ("--dry-run" in args) dryRun()
@@ -84,7 +84,7 @@ fun main(args: Array<String>) {
             onDispose { SystemTray.getSystemTray().remove(trayIcon) }
         }
 
-        val windowState = rememberWindowState(size = DpSize(WIDTH.dp, MAX_HEIGHT.dp))
+        val windowState = rememberWindowState(size = DpSize(WIDTH.dp, HEIGHT.dp))
         Window(
             onCloseRequest = { open = false },
             visible = open,
@@ -147,10 +147,7 @@ fun main(args: Array<String>) {
             Popover(app, onQuit = ::exitApplication, onClose = {
                 open = false
                 hiddenAt = System.currentTimeMillis()
-            }) {
-                windowState.size =
-                    DpSize(WIDTH.dp, it.coerceAtMost(MAX_HEIGHT.dp))
-            }
+            })
         }
     }
 }
