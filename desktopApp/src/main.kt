@@ -13,6 +13,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import kotlinx.coroutines.delay
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.GraphicsEnvironment
@@ -30,12 +31,9 @@ import java.awt.image.BufferedImage
 import java.nio.file.Path
 import kotlin.system.exitProcess
 
-// 팝오버 크기(그림자 여백 포함)
-private const val WIDTH = 360
+// 팝오버 크기
+private const val WIDTH = 340
 private const val MAX_HEIGHT = 620
-
-// Popover 바깥의 그림자용 투명 여백
-private const val SHADOW = 10
 
 fun main(args: Array<String>) {
     if ("--dry-run" in args) dryRun()
@@ -99,13 +97,23 @@ fun main(args: Array<String>) {
                 window.addWindowFocusListener(listener)
                 onDispose { window.removeWindowFocusListener(listener) }
             }
+            DisposableEffect(window) {
+                // 끌어서 옮길 수 없게 하고, 그림자는 macOS가 창 모양대로 그리게 한다
+                window.rootPane.putClientProperty("apple.awt.draggableWindowBackground", false)
+                window.rootPane.putClientProperty("Window.shadow", true)
+                onDispose {}
+            }
             LaunchedEffect(open, anchor) {
                 if (!open) return@LaunchedEffect
-                // AWT로 직접 옮기면 창이 뜰 때 Compose가 기본 위치로 덮어쓴다
-                val location = popoverLocation(trayIconLocation(trayIcon), anchor)
-                windowState.position = WindowPosition(location.x.dp, location.y.dp)
                 window.toFront()
                 window.requestFocus()
+                // 열려 있는 동안 아이콘 위치를 따라간다. 창이 밀려나도 제자리로 되돌린다
+                while (true) {
+                    val location = popoverLocation(trayIconLocation(trayIcon), anchor)
+                    val target = WindowPosition(location.x.dp, location.y.dp)
+                    if (windowState.position != target || window.location != location) windowState.position = target
+                    delay(250)
+                }
             }
             Popover(app, onQuit = ::exitApplication) {
                 windowState.size =
@@ -126,10 +134,8 @@ private fun popoverLocation(icon: Point?, click: Point?): Point {
         screens.firstOrNull { reference != null && it.bounds.contains(reference.x, it.bounds.y) } ?: screens.first()
     val bounds = screen.bounds
     val menuBarBottom = bounds.y + Toolkit.getDefaultToolkit().getScreenInsets(screen).top
-    val contentWidth = WIDTH - 2 * SHADOW
-    val left = icon?.x ?: click?.let { it.x - 12 } ?: (bounds.x + bounds.width - contentWidth - 8)
-    val contentLeft = left.coerceIn(bounds.x + 6, bounds.x + bounds.width - contentWidth - 6)
-    return Point(contentLeft - SHADOW, menuBarBottom - SHADOW)
+    val left = icon?.x ?: click?.let { it.x - 12 } ?: (bounds.x + bounds.width - WIDTH - 8)
+    return Point(left.coerceIn(bounds.x + 6, bounds.x + bounds.width - WIDTH - 6), menuBarBottom)
 }
 
 /** 템플릿 이미지(알파만 사용)로 그린 폴더 모양 */
