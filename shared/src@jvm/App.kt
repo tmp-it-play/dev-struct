@@ -251,10 +251,10 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Pill("고정", p, subtle = true) { app.pin(plan) }
                     if (app.autoMove || plan.dir in app.approved) {
                         WaitingLabel(app, plan, p)
                     } else {
+                        Pill("고정", p, subtle = true) { app.pin(plan) }
                         Pill("승인", p) { app.approve(plan) }
                     }
                 }
