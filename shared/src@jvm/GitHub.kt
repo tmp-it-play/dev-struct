@@ -34,20 +34,43 @@ object GitHub {
         return GitHubRepo(json.string("id").toLong(), RepoRef(owner, name), json.string("fork").toBoolean())
     }
 
-    /** 2xx가 아니거나 네트워크 오류면 null. */
-    fun get(path: String): JsonObject? = runCatching {
+    private val etagCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String>>()
+
+    /**
+     * 2xx면 JSON, 404 등이면 null. 요청 한도를 넘기면 [GitHubLimitException]을 던진다.
+     * 같은 요청은 ETag로 다시 보내 304를 받는다(304는 한도에서 빠지지 않는다).
+     */
+    fun get(path: String): JsonObject? {
+        val cached = etagCache[path]
         val request =
             HttpRequest
                 .newBuilder(URI.create("https://api.github.com/$path"))
                 .header("Accept", "application/vnd.github+json")
                 .apply { GitHubAuth.token()?.let { header("Authorization", "Bearer $it") } }
+                .apply { cached?.let { header("If-None-Match", it.first) } }
                 .timeout(Duration.ofSeconds(20))
                 .build()
-        val response = http.send(request, HttpResponse.BodyHandlers.ofString())
-        // 토큰이 폐기됐으면 비로그인으로 돌아간다
-        if (response.statusCode() == 401 && GitHubAuth.token() != null) GitHubAuth.logout()
-        if (response.statusCode() in 200..299) Json.parseToJsonElement(response.body()).jsonObject else null
-    }.getOrNull()
+        val response =
+            runCatching { http.send(request, HttpResponse.BodyHandlers.ofString()) }.getOrNull() ?: return null
+        val status = response.statusCode()
+        val header = { name: String -> response.headers().firstValue(name).orElse(null) }
+        val body =
+            when {
+                status == 304 && cached != null -> cached.second
+                status in 200..299 -> response.body().also { b -> header("ETag")?.let { etagCache[path] = it to b } }
+                status == 429 || (
+                    status == 403 && header(
+                        "x-ratelimit-remaining",
+                    ) == "0"
+                    ) -> throw GitHubLimitException()
+                else -> {
+                    // 토큰이 폐기됐으면 비로그인으로 돌아간다
+                    if (status == 401 && GitHubAuth.token() != null) GitHubAuth.logout()
+                    return null
+                }
+            }
+        return Json.parseToJsonElement(body).jsonObject
+    }
 
     fun postForm(url: String, form: Map<String, String>): JsonObject {
         val body = form.entries.joinToString("&") { (k, v) -> "$k=${java.net.URLEncoder.encode(v, Charsets.UTF_8)}" }
@@ -66,5 +89,7 @@ object GitHub {
         return http.send(request, HttpResponse.BodyHandlers.ofFile(dest)).statusCode() in 200..299
     }
 }
+
+class GitHubLimitException : Exception("GitHub 요청 한도를 넘었어요")
 
 fun JsonObject.string(key: String): String = (get(key) as JsonElement?)?.jsonPrimitive?.content.orEmpty()
