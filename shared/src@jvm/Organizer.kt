@@ -35,11 +35,12 @@ class Organizer(private val root: Path, private val log: (String) -> Unit) {
     private fun plan(dir: Path): RepoPlan? {
         val remote = git(dir, "remote", "get-url", "origin") ?: return null
         val ref = parseGitHubRemote(remote) ?: return null
-        // 레포 ID는 이전·이름 변경에도 바뀌지 않아 리다이렉트가 끊겨도 추적된다
+        // remote 이름으로 먼저 찾는다(이전·이름 변경은 리다이렉트로 따라간다). 리다이렉트가 끊겼을 때만 저장된 ID로 찾는다.
+        // ID를 먼저 쓰면 사용자가 remote를 다른 레포로 바꿨을 때 예전 레포로 되돌려버린다.
         val storedId = git(dir, "config", "--local", "devstruct.repoId")?.toLongOrNull()
         val repo =
-            storedId?.let(GitHub::byId) ?: GitHub.byRef(ref) ?: run {
-                log("GitHub에서 찾을 수 없어 건너뜀: ${ref.fullName} ($dir)")
+            GitHub.byRef(ref) ?: storedId?.let(GitHub::byId) ?: run {
+                log("GitHub에서 찾을 수 없어 건너뜀(비공개 레포는 로그인 필요): ${ref.fullName}")
                 return null
             }
         val newRemote = if (repo.ref.sameAs(ref)) null else rewriteGitHubRemote(remote, repo.ref)
