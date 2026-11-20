@@ -26,6 +26,11 @@ object Settings {
     var devTools: Boolean
         get() = prefs.getBoolean("jetbrains", true)
         set(value) = prefs.putBoolean("jetbrains", value)
+
+    /** 루트 밖 홈 폴더 전체에서도 저장소를 찾는다 */
+    var discover: Boolean
+        get() = prefs.getBoolean("discover", true)
+        set(value) = prefs.putBoolean("discover", value)
 }
 
 /** 로그인 시 실행. .app 번들로 실행했을 때만 쓸 수 있다. */

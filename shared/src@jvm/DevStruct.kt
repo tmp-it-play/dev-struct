@@ -16,6 +16,7 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption.APPEND
 import java.nio.file.StandardOpenOption.CREATE
 import java.time.LocalDateTime
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -48,6 +49,12 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     var pinned by mutableStateOf<List<RepoPlan>>(emptyList())
         private set
 
+    /** 루트 밖에서 찾은 저장소(승인하면 가져온다)와, 그중 지금 위치에 두기로 한 저장소 */
+    var discovered by mutableStateOf<List<Discovered>>(emptyList())
+        private set
+    var keptElsewhere by mutableStateOf<List<Discovered>>(emptyList())
+        private set
+
     /** 수동 업데이트 확인 결과("최신 버전이에요" 등) */
     var updateStatus by mutableStateOf<String?>(null)
         private set
@@ -60,7 +67,79 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
 
     private val scanRequest = Channel<Unit>(Channel.CONFLATED)
 
-    fun start() = scope.launch {
+    private val discoverRequest = Channel<Unit>(Channel.CONFLATED)
+
+    // 홈 폴더 찾기는 한 흐름에서만 천천히 돈다
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val discoveryDispatcher = Dispatchers.IO.limitedParallelism(1)
+
+    fun start() {
+        scope.launch { discoverLoop() }
+        scanLoop()
+    }
+
+    /** 시작 1분 뒤 한 바퀴 돌고, 이후 6시간마다(설정을 바꾸면 바로) 다시 돈다 */
+    private suspend fun discoverLoop() {
+        withTimeoutOrNull(60.seconds) { discoverRequest.receive() }
+        while (true) {
+            if (Settings.discover) {
+                val home = Path.of(System.getProperty("user.home"))
+                val found = withContext(discoveryDispatcher) { Discovery(home, Path.of(Settings.root)).scan() }
+                discovered = found.filter { !it.pinned }.sortedBy { it.dir }
+                keptElsewhere = found.filter { it.pinned }.sortedBy { it.dir }
+                log("홈 폴더 찾기 완료: 루트 밖 저장소 ${found.size}개")
+            } else {
+                discovered = emptyList()
+            }
+            withTimeoutOrNull(6.hours) { discoverRequest.receive() }
+        }
+    }
+
+    fun discoverNow() {
+        discoverRequest.trySend(Unit)
+    }
+
+    /** 루트 밖 저장소를 GitHub에서 확인해 루트의 제자리로 옮기도록 대기열에 넣는다(IDE 대기 규칙은 같다) */
+    fun importRepo(found: Discovered) {
+        scope.launch {
+            val organizer = Organizer(Path.of(Settings.root), ::log)
+            val plan =
+                try {
+                    withContext(Dispatchers.IO) { organizer.plan(found.dir)?.also(organizer::applyGit) }
+                } catch (e: GitHubLimitException) {
+                    problem = limitMessage(e.resetAt)
+                    return@launch
+                }
+            if (plan == null) {
+                problem = "GitHub에서 ${found.ref.fullName}을(를) 찾지 못했어요"
+                return@launch
+            }
+            discovered = discovered.filter { it.dir != found.dir }
+            if (!plan.needsMove) return@launch
+            pending = pending.filter { it.dir != plan.dir } + plan
+            approved = approved + plan.dir
+            scanNow()
+        }
+    }
+
+    /** 루트 밖 저장소를 지금 위치에 고정해 다시 묻지 않는다 */
+    fun keepHere(found: Discovered) {
+        scope.launch {
+            withContext(Dispatchers.IO) { Organizer(Path.of(Settings.root), ::log).setPinned(found.dir, true) }
+            discovered = discovered.filter { it.dir != found.dir }
+            keptElsewhere = (keptElsewhere + found.copy(pinned = true)).sortedBy { it.dir }
+        }
+    }
+
+    fun unkeep(found: Discovered) {
+        scope.launch {
+            withContext(Dispatchers.IO) { Organizer(Path.of(Settings.root), ::log).setPinned(found.dir, false) }
+            keptElsewhere = keptElsewhere.filter { it.dir != found.dir }
+            discovered = (discovered + found.copy(pinned = false)).sortedBy { it.dir }
+        }
+    }
+
+    private fun scanLoop() = scope.launch {
         while (isActive) {
             if (System.currentTimeMillis() >= nextScanAt) {
                 nextScanAt = System.currentTimeMillis() + Settings.intervalMinutes.minutes.inWholeMilliseconds
@@ -198,7 +277,15 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             val isNew = moves.any { m -> pending.none { it.dir == m.dir } }
             // 한도에 걸려 중간에 멈췄으면 아직 못 본 저장소의 기존 대기 항목은 남긴다
             val scanned = plans.map { it.dir }.toSet()
-            pending = if (result.limitedUntil == null) moves else pending.filter { it.dir !in scanned } + moves
+            // 루트 밖에서 가져오기로 한 항목은 루트 확인 결과와 상관없이 남긴다
+            val root = Path.of(Settings.root)
+            val external = pending.filter { !it.dir.startsWith(root) }
+            pending =
+                if (result.limitedUntil == null) {
+                    moves + external
+                } else {
+                    pending.filter { it.dir !in scanned } + moves.filter { m -> pending.none { it.dir == m.dir } }
+                }
             approved = approved.filterTo(mutableSetOf()) { dir -> pending.any { it.dir == dir } }
             log("스캔 완료: 저장소 ${plans.size}개, 이동 필요 ${moves.size}개")
             loggedIn = GitHubAuth.token() != null

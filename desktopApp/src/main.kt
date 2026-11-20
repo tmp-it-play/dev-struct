@@ -197,6 +197,15 @@ private fun dryRun(): Nothing {
     plans.filter {
         it.needsMove
     }.forEach { println("move:   ${root.relativize(it.dir)} → ${root.relativize(it.target)}") }
+    val home = Path.of(System.getProperty("user.home"))
+    kotlinx.coroutines.runBlocking { Discovery(home, root).scan(pause = 0) }.forEach {
+        println(
+            "found:  ${it.dir.toString().replaceFirst(
+                home.toString(),
+                "~",
+            )} (${it.ref.fullName})${if (it.pinned) " [고정]" else ""}",
+        )
+    }
     println("저장소 ${plans.size}개, IDE 실행 중: ${DevTools.running().ifEmpty { listOf("없음") }.joinToString()}")
     exitProcess(0)
 }

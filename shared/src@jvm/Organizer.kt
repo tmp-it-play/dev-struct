@@ -50,7 +50,8 @@ class Organizer(private val root: Path, private val log: (String) -> Unit) {
 
     private fun Path.isRepo() = resolve(".git").isDirectory()
 
-    private fun plan(dir: Path): RepoPlan? {
+    /** 루트 밖 저장소도 루트 안의 목표 위치로 계획한다. remote가 없거나 GitHub가 아니면 null */
+    fun plan(dir: Path): RepoPlan? {
         val remote = git(dir, "remote", "get-url", "origin") ?: return null
         val ref = parseGitHubRemote(remote) ?: return null
         // remote 이름으로 먼저 찾는다(이전·이름 변경은 리다이렉트로 따라간다). 리다이렉트가 끊겼을 때만 저장된 ID로 찾는다.
@@ -106,7 +107,8 @@ class Organizer(private val root: Path, private val log: (String) -> Unit) {
     }
 
     private fun removeIfEmpty(dir: Path) {
-        if (dir == root) return
+        // 루트 밖(예: ~/Desktop)에서 가져온 경우 원래 폴더는 비어도 지우지 않는다
+        if (dir == root || !dir.startsWith(root)) return
         if (dir.listDirectoryEntries().all { it.name == ".DS_Store" }) dir.toFile().deleteRecursively()
     }
 

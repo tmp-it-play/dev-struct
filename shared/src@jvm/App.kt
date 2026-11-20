@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -206,7 +207,7 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
         }
     }
 
-    if (app.pending.isEmpty()) {
+    if (app.pending.isEmpty() && app.discovered.isEmpty()) {
         Column(
             Modifier.fillMaxWidth().padding(vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -218,30 +219,55 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
         return
     }
 
-    SectionTitle("옮길 저장소", p) {
-        if (!app.autoMove && app.pending.any { it.dir !in app.approved }) {
-            Text(
-                "모두 승인",
-                color = p.accent,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.pressable(app::approveAll),
-            )
+    if (app.pending.isNotEmpty()) {
+        SectionTitle("옮길 저장소", p) {
+            if (!app.autoMove && app.pending.any { it.dir !in app.approved }) {
+                Text(
+                    "모두 승인",
+                    color = p.accent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.pressable(app::approveAll),
+                )
+            }
+        }
+        val root = Path.of(Settings.root)
+        app.pending.forEach { plan ->
+            val from = root.relativize(plan.dir)
+            val to = root.relativize(plan.target)
+            val detail =
+                when {
+                    // 루트 밖에서 가져오는 저장소
+                    !plan.dir.startsWith(root) -> "${homeRelative(plan.dir)} → ${to.parent}"
+                    from.parent == to.parent -> "${from.name}에서 이름 변경"
+                    else -> "${from.parent ?: "루트 폴더"} → ${to.parent}"
+                }
+            ItemRow(Icons.Filled.ArrowForward, plan.repo.ref.name, detail, p) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Pill("고정", p, subtle = true) { app.pin(plan) }
+                    if (app.autoMove || plan.dir in app.approved) {
+                        WaitingLabel(app, p)
+                    } else {
+                        Pill("승인", p) { app.approve(plan) }
+                    }
+                }
+            }
         }
     }
-    val root = Path.of(Settings.root)
-    app.pending.forEach { plan ->
-        val from = root.relativize(plan.dir)
-        val to = root.relativize(plan.target)
-        val detail =
-            if (from.parent == to.parent) "${from.name}에서 이름 변경" else "${from.parent ?: "루트 폴더"} → ${to.parent}"
-        ItemRow(Icons.Filled.ArrowForward, plan.repo.ref.name, detail, p) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Pill("고정", p, subtle = true) { app.pin(plan) }
-                if (app.autoMove || plan.dir in app.approved) {
-                    WaitingLabel(app, p)
-                } else {
-                    Pill("승인", p) { app.approve(plan) }
+
+    if (app.discovered.isNotEmpty()) {
+        SectionTitle("다른 곳에서 찾은 저장소 ${app.discovered.size}", p)
+        app.discovered.forEach { found ->
+            ItemRow(Icons.Filled.Search, found.ref.name, "${homeRelative(found.dir)} → ${found.ref.owner}", p) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Pill("여기 두기", p, subtle = true) { app.keepHere(found) }
+                    Pill("가져오기", p) { app.importRepo(found) }
                 }
             }
         }
@@ -254,6 +280,7 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
     var interval by remember { mutableStateOf(Settings.intervalMinutes) }
     var loginItem by remember { mutableStateOf(LoginItem.enabled) }
     var devTools by remember { mutableStateOf(Settings.devTools) }
+    var discover by remember { mutableStateOf(Settings.discover) }
     var showNotices by remember { mutableStateOf(false) }
 
     if (showNotices) {
@@ -308,6 +335,14 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
             }
         }
         Hairline(p)
+        SettingRow("홈 폴더에서도 찾기", p, info = DISCOVER_INFO) {
+            MacSwitch(discover, p) {
+                discover = it
+                Settings.discover = it
+                app.discoverNow()
+            }
+        }
+        Hairline(p)
         SettingRow("로그인 시 열기", p) {
             MacSwitch(loginItem, p, enabled = LoginItem.available) {
                 if (it) LoginItem.enable() else LoginItem.disable()
@@ -351,7 +386,7 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
         }
     }
 
-    if (app.pinned.isNotEmpty()) PinnedSection(app, p)
+    if (app.pinned.isNotEmpty() || app.keptElsewhere.isNotEmpty()) PinnedSection(app, p)
 
     SectionTitle("정보", p)
     Group(p) {
@@ -365,9 +400,15 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
     }
 }
 
+private const val DISCOVER_INFO =
+    "루트 밖 홈 폴더 전체를 천천히 훑어 GitHub 저장소를 찾아요. 찾은 저장소는 '가져오기'를 눌러야 옮겨요. " +
+        "숨김 폴더와 ~/Library는 건너뛰어요."
+
 private const val DEV_TOOLS_INFO =
     "JetBrains IDE, Android Studio, VS Code, Cursor, Windsurf, Orca, Paseo, herdr, Air가 켜져 있으면 끌 때까지 기다렸다가 옮기고, " +
         "옮긴 뒤 이 도구들이 기억하는 프로젝트 경로도 바꿔요."
+
+private fun homeRelative(path: Path) = path.toString().replaceFirst(System.getProperty("user.home"), "~")
 
 private fun intervalLabel(minutes: Int) = if (minutes < 60) "${minutes}분" else "${minutes / 60}시간"
 
@@ -645,13 +686,18 @@ private fun ProgressPill(progress: Float, p: Palette) {
 @Composable
 private fun PinnedSection(app: DevStruct, p: Palette) {
     var expanded by remember { mutableStateOf(false) }
+    val root = Path.of(Settings.root)
+    // 루트 안에서 고정한 저장소와, 루트 밖에서 "여기 두기"한 저장소
+    val rows =
+        app.pinned.map { Triple(it.repo.ref.name, root.relativize(it.dir).toString()) { app.unpin(it) } } +
+            app.keptElsewhere.map { Triple(it.ref.name, homeRelative(it.dir)) { app.unkeep(it) } }
     SectionTitle("예외", p)
     Group(p) {
         Row(
             Modifier.fillMaxWidth().height(38.dp).pressable { expanded = !expanded }.padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("고정된 저장소 ${app.pinned.size}개", color = p.label, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text("고정된 저장소 ${rows.size}개", color = p.label, fontSize = 13.sp, modifier = Modifier.weight(1f))
             Icon(
                 if (expanded) Icons.Filled.KeyboardArrowDown else Icons.Filled.KeyboardArrowRight,
                 null,
@@ -660,30 +706,23 @@ private fun PinnedSection(app: DevStruct, p: Palette) {
             )
         }
         if (expanded) {
-            val root = Path.of(Settings.root)
-            app.pinned.forEach { plan ->
+            rows.forEach { (name, location, release) ->
                 Hairline(p)
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
+                        Text(name, color = p.label, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            plan.repo.ref.name,
-                            color = p.label,
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            root.relativize(plan.dir).toString(),
+                            location,
                             color = p.secondary,
                             fontSize = 11.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    Pill("해제", p, subtle = true) { app.unpin(plan) }
+                    Pill("해제", p, subtle = true, onClick = release)
                 }
             }
         }
