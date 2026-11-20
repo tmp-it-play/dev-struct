@@ -107,10 +107,8 @@ If a single rule has more than 20 violations, report the count and the first 3 s
 
 For each agent file in `.claude/agents/*.md`, `.codex/agents/*.toml`, and each skill file in `.claude/skills/**/*.md`, read the body and check:
 
-1. **kotlin-convention-validator**: Does it check the applicable coding rules found in Step 1? Are any rules missing or stated differently?
-2. **kotlin-test-fixer**: Does it reference Kotest as the test framework (not JUnit directly)?
-3. **All skill files** that reference project conventions: Do they follow the conflict handling, path scopes, and missing-file handling from Step 1?
-4. **Any agent/skill** that states a rule contradicting an applicable documented rule (e.g., allowing a forbidden pattern in a specific context)?
+1. **All skill files** that reference project conventions: Do they follow the conflict handling, path scopes, and missing-file handling from Step 1?
+2. **Any agent/skill** that states a rule contradicting an applicable documented rule (e.g., allowing a forbidden pattern in a specific context)?
 
 Also check `.agents/skills/**/*.md` independently for the same issues.
 
