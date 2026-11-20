@@ -72,6 +72,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -413,8 +417,12 @@ private fun ColumnScope.SettingsTab(
         SettingRow("버전 $APP_VERSION", p) {
             val update = app.update
             when {
-                app.updateProgress != null -> ProgressPill(app.updateProgress!!, p)
-                update != null -> Pill("${update.tag} 설치", p, onClick = app::installUpdate)
+                update != null -> Pill(
+                    "${update.tag} 설치",
+                    p,
+                    progress = app.updateProgress,
+                    onClick = app::installUpdate,
+                )
                 app.checkingUpdate -> Text("확인하는 중…", color = p.secondary, fontSize = 12.sp)
                 else -> Pill("업데이트 확인", p, onClick = app::checkForUpdate)
             }
@@ -678,20 +686,39 @@ private fun Hairline(p: Palette) =
     Box(Modifier.padding(start = 12.dp).fillMaxWidth().height(0.5.dp).background(p.hairline))
 
 @Composable
-private fun Pill(label: String, p: Palette, subtle: Boolean = false, onClick: () -> Unit) {
+private fun Pill(label: String, p: Palette, subtle: Boolean = false, progress: Float? = null, onClick: () -> Unit) {
     val color = if (subtle) p.secondary else p.accent
-    Text(
-        label,
-        color = color,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium,
-        modifier =
-        Modifier
-            .clip(CircleShape)
-            .background(if (subtle) p.segmentTrack else color.copy(alpha = 0.14f))
-            .pressable(onClick)
-            .padding(horizontal = 11.dp, vertical = 3.dp),
-    )
+    val fraction = progress?.coerceIn(0f, 1f)
+    val action = if (fraction == null) {
+        Modifier.pressable(onClick)
+    } else {
+        Modifier.clearAndSetSemantics {
+            contentDescription = label
+            progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
+        }
+    }
+    Box(
+        Modifier.clip(CircleShape).background(if (subtle) p.segmentTrack else color.copy(alpha = 0.14f)).then(action),
+        contentAlignment = Alignment.Center,
+    ) {
+        // 설치 중에도 원래 레이블로 버튼 크기를 정한다.
+        Text(
+            label,
+            color = if (fraction == null) color else Color.Transparent,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 3.dp),
+        )
+        if (fraction != null) {
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                Spacer(
+                    Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(fraction)
+                        .background(color.copy(alpha = 0.38f)),
+                )
+                Text("${(fraction * 100).toInt()}%", color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
 }
 
 /** 승인했지만 아직 옮기지 않은 이유. IDE 때문이면 어떤 IDE인지 툴팁으로 알려준다 */
@@ -743,26 +770,6 @@ private fun Tip(text: String, p: Palette) {
             .background(p.window)
             .padding(horizontal = 10.dp, vertical = 7.dp),
     )
-}
-
-/** 설치 버튼이 진행률만큼 왼쪽부터 채워진다. 채워지기 전에도 옅은 바탕색은 있다 */
-@Composable
-private fun ProgressPill(progress: Float, p: Palette) {
-    Box(
-        Modifier
-            .width(88.dp)
-            .height(22.dp)
-            .clip(CircleShape)
-            .background(p.accent.copy(alpha = 0.14f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier.align(
-                Alignment.CenterStart,
-            ).fillMaxHeight().fillMaxWidth(progress.coerceIn(0f, 1f)).background(p.accent.copy(alpha = 0.38f)),
-        )
-        Text("${(progress * 100).toInt()}%", color = p.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
 }
 
 /** 고정된 저장소 목록. 기본은 접혀 있다 */

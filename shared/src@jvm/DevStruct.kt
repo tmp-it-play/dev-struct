@@ -347,8 +347,10 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String, 
     /** 한도에 걸렸으면 초기화 시각을 돌려준다 */
     private suspend fun checkUpdate(): Long? = try {
         val latest = withContext(Dispatchers.IO) { Updater.latestNewer() }
-        if (latest != null && latest != update) notify("새 버전 ${latest.tag}을 설치할 수 있어요", Page.Settings)
-        update = latest
+        if (updateProgress == null) {
+            if (latest != null && latest != update) notify("새 버전 ${latest.tag}을 설치할 수 있어요", Page.Settings)
+            update = latest
+        }
         null
     } catch (e: GitHubLimitException) {
         e.resetAt
