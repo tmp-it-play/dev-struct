@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption.APPEND
 import java.nio.file.StandardOpenOption.CREATE
 import java.time.LocalDateTime
@@ -157,7 +158,13 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     }
 
     private fun log(message: String) {
-        runCatching { Files.writeString(LOG_FILE, "${LocalDateTime.now()} $message\n", CREATE, APPEND) }
+        runCatching {
+            // 1MB를 넘으면 이전 로그 한 개만 남긴다
+            if (Files.exists(LOG_FILE) && Files.size(LOG_FILE) > 1_000_000) {
+                Files.move(LOG_FILE, LOG_FILE.resolveSibling("DevStruct.old.log"), StandardCopyOption.REPLACE_EXISTING)
+            }
+            Files.writeString(LOG_FILE, "${LocalDateTime.now()} $message\n", CREATE, APPEND)
+        }
     }
 
     private companion object {
