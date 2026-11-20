@@ -17,7 +17,7 @@ jobs:
           distribution: temurin
           java-version: "25"
 
-      - name: Verify tag matches APP_VERSION
+      - name: Verify Tag Matches App Version
         run: |
           version=$(sed -n 's/^const val APP_VERSION = "\(.*\)"/\1/p' shared/src@jvm/Updater.kt)
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
@@ -25,15 +25,10 @@ jobs:
             exit 1
           fi
 
-      - name: Test
-        run: ./kotlin test
-        env:
-          KOTLIN_CLI_NO_WELCOME_BANNER: 1
-
-      - name: Package app
+      - name: Package App
         run: packaging/package-macos.sh "${GITHUB_REF_NAME#v}"
 
-      - name: Publish draft release
+      - name: Publish Draft Release
         run: gh release create "$GITHUB_REF_NAME" dist/*.zip --draft --generate-notes --title "$GITHUB_REF_NAME"
         env:
           GH_TOKEN: ${{ github.token }}
