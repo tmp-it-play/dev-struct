@@ -21,14 +21,13 @@ object Settings {
     var autoMove: Boolean
         get() = prefs.getBoolean("autoMove", false)
         set(value) = prefs.putBoolean("autoMove", value)
-
-    var loginItemInitialized: Boolean
-        get() = prefs.getBoolean("loginItemInitialized", false)
-        set(value) = prefs.putBoolean("loginItemInitialized", value)
 }
 
 /** 로그인 시 실행. .app 번들로 실행했을 때만 쓸 수 있다. */
 object LoginItem {
+    /** 로그인 시 실행되면 팝오버를 띄우지 않는다 */
+    const val BACKGROUND_ARG = "--background"
+
     private val plist =
         Path.of(System.getProperty("user.home"), "Library/LaunchAgents/team.themoment.devstruct.plist")
 
@@ -48,7 +47,7 @@ object LoginItem {
             <dict>
                 <key>Label</key><string>team.themoment.devstruct</string>
                 <key>ProgramArguments</key>
-                <array><string>/usr/bin/open</string><string>$bundle</string></array>
+                <array><string>/usr/bin/open</string><string>$bundle</string><string>--args</string><string>$BACKGROUND_ARG</string></array>
                 <key>RunAtLoad</key><true/>
             </dict>
             </plist>
@@ -56,11 +55,9 @@ object LoginItem {
         )
     }
 
-    /** 처음 실행하면 켜고, 켜져 있으면 앱 위치가 바뀌었을 수 있으니 다시 쓴다. 사용자가 끈 건 유지한다. */
+    /** 기본은 꺼짐. 켜져 있으면 앱 위치가 바뀌었을 수 있으니 다시 쓴다. */
     fun syncOnStart() {
-        if (!available) return
-        if (!Settings.loginItemInitialized || enabled) enable()
-        Settings.loginItemInitialized = true
+        if (available && enabled) enable()
     }
 
     fun disable() {
