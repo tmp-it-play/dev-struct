@@ -207,5 +207,6 @@ private fun dryRun(): Nothing {
         )
     }
     println("저장소 ${plans.size}개, IDE 실행 중: ${DevTools.running().ifEmpty { listOf("없음") }.joinToString()}")
+    println("에이전트 실행 중: ${DevTools.runningAgents().ifEmpty { listOf("없음") }.joinToString()}")
     exitProcess(0)
 }

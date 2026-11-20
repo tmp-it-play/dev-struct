@@ -132,6 +132,40 @@ object DevTools {
         if (Files.isDirectory(old) && !Files.exists(new)) Files.move(old, new)
     }
 
+    // 에이전트 CLI: 실행 파일 이름, 또는 Node·Python으로 실행될 때 명령에 들어 있는 패키지 이름
+    private val agentBinaries = mapOf(
+        "claude" to "Claude Code",
+        "codex" to "Codex",
+        "copilot" to "GitHub Copilot CLI",
+        "hermes" to "Hermes",
+    )
+    private val agentPackages =
+        mapOf(
+            "@anthropic-ai/claude-code" to "Claude Code",
+            "@openai/codex" to "Codex",
+            "@github/copilot" to "GitHub Copilot CLI",
+            "gemini-cli" to "Gemini",
+            "/bin/gemini" to "Gemini",
+            "hermes" to "Hermes",
+        )
+
+    /**
+     * 실행 중인 에이전트 CLI. 이들은 켜져 있는 동안 설정을 다시 써서, 옮기며 바꾼 경로를 예전 값으로 덮어쓸 수 있다.
+     * 앱 번들·IDE 플러그인 안에서 뜬 같은 이름의 프로세스(예: Android Studio의 copilot)는 CLI 설정을 쓰지 않으므로 뺀다.
+     */
+    fun runningAgents(): List<String> = ProcessHandle
+        .allProcesses()
+        .toList()
+        .mapNotNull { process ->
+            val info = process.info()
+            val command = info.command().orElse(null) ?: return@mapNotNull null
+            if (".app/Contents" in command || "/plugins/" in command) return@mapNotNull null
+            agentBinaries[command.substringAfterLast('/')]
+                ?: info.arguments().orElse(emptyArray()).joinToString(" ").let { args ->
+                    agentPackages.entries.firstOrNull { it.key in args }?.value
+                }
+        }.distinct()
+
     /** 이 폴더 안을 작업 폴더로 쓰는 프로세스(터미널, 에이전트 등)가 있는 경로들. 옮기면 그 프로세스가 망가진다 */
     fun busyDirs(): List<Path> = runCommand("lsof", "-a", "-d", "cwd", "-Fn")
         .output

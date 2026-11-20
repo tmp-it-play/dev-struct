@@ -219,6 +219,10 @@ private fun ColumnScope.ReposTab(app: DevStruct, p: Palette, onClose: () -> Unit
         return
     }
 
+    if (app.pending.isNotEmpty() && app.runningAgents.isNotEmpty()) {
+        Notice("${app.runningAgents.joinToString()} 세션이 실행 중이에요. 옮기면 이 도구가 바뀐 경로를 예전 값으로 덮어쓸 수 있어요.", p)
+    }
+
     if (app.pending.isNotEmpty()) {
         SectionTitle("옮길 저장소", p) {
             if (!app.autoMove && app.pending.any { it.dir !in app.approved }) {
@@ -349,6 +353,15 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
                 loginItem = LoginItem.enabled
             }
         }
+    }
+
+    if (devTools) {
+        Text(
+            "Claude Code·Codex 같은 에이전트 세션이 실행 중일 때 옮기면, 그 도구가 바뀐 경로를 예전 값으로 덮어쓸 수 있어요.",
+            color = p.warning,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
     }
 
     SectionTitle("GitHub", p)
@@ -649,6 +662,16 @@ private fun WaitingLabel(app: DevStruct, plan: RepoPlan, p: Palette) {
             Spacer(Modifier.width(3.dp))
             Icon(Icons.Outlined.Info, null, tint = p.warning, modifier = Modifier.size(12.dp))
         }
+    }
+}
+
+/** 경고 한 줄(주황색 느낌표 + 문장) */
+@Composable
+private fun Notice(text: String, p: Palette) {
+    Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
+        Icon(Icons.Filled.Warning, null, tint = p.warning, modifier = Modifier.size(14.dp).padding(top = 1.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text, color = p.warning, fontSize = 12.sp)
     }
 }
 

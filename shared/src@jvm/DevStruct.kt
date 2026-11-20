@@ -29,6 +29,10 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     var blockingIdes by mutableStateOf<List<String>>(emptyList())
         private set
 
+    /** 실행 중인 에이전트 CLI. 옮기며 바꾼 경로를 덮어쓸 수 있어 경고한다 */
+    var runningAgents by mutableStateOf<List<String>>(emptyList())
+        private set
+
     /** 터미널·에이전트가 작업 폴더로 쓰고 있어 미룬 저장소 */
     var busyRepos by mutableStateOf<Set<Path>>(emptySet())
         private set
@@ -324,6 +328,14 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     }
 
     private suspend fun processMoves() {
+        runningAgents =
+            if (pending.isNotEmpty() &&
+                Settings.devTools
+            ) {
+                withContext(Dispatchers.IO) { DevTools.runningAgents() }
+            } else {
+                emptyList()
+            }
         val ready = pending.filter { autoMove || it.dir in approved }
         if (ready.isEmpty()) return
         blockingIdes = if (Settings.devTools) withContext(Dispatchers.IO) { DevTools.running() } else emptyList()
