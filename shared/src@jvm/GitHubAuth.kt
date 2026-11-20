@@ -76,10 +76,12 @@ object GitHubAuth {
     private fun save(token: String) {
         runCommand("security", "add-generic-password", "-U", "-s", SERVICE, "-a", ACCOUNT, "-w", token)
         cached = token
+        GitHub.clearCache()
     }
 
     fun logout() {
         runCommand("security", "delete-generic-password", "-s", SERVICE, "-a", ACCOUNT)
         cached = null
+        GitHub.clearCache()
     }
 }

@@ -49,8 +49,8 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
     fun start() = scope.launch {
         while (isActive) {
             if (System.currentTimeMillis() >= nextScanAt) {
-                scan()
                 nextScanAt = System.currentTimeMillis() + Settings.intervalMinutes.minutes.inWholeMilliseconds
+                scan()
             }
             processMoves()
             // IDE가 꺼지는 순간을 잡기 위해 대기 중엔 짧게 다시 확인한다
@@ -114,26 +114,41 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         scanning = true
         try {
             val organizer = Organizer(Path.of(Settings.root), ::log)
-            val plans = withContext(Dispatchers.IO) { organizer.scan().onEach(organizer::applyGit) }
+            val result = withContext(Dispatchers.IO) { organizer.scan() }
+            val plans = result.plans
+            withContext(Dispatchers.IO) { plans.forEach(organizer::applyGit) }
             val moves = plans.filter { it.needsMove }
             val isNew = moves.any { m -> pending.none { it.dir == m.dir } }
-            pending = moves
-            approved = approved.filterTo(mutableSetOf()) { dir -> moves.any { it.dir == dir } }
+            // 한도에 걸려 중간에 멈췄으면 아직 못 본 레포의 기존 대기 항목은 남긴다
+            val scanned = plans.map { it.dir }.toSet()
+            pending = if (result.limitedUntil == null) moves else pending.filter { it.dir !in scanned } + moves
+            approved = approved.filterTo(mutableSetOf()) { dir -> pending.any { it.dir == dir } }
             log("스캔 완료: 레포 ${plans.size}개, 이동 필요 ${moves.size}개")
-            val latest = withContext(Dispatchers.IO) { Updater.latestNewer() }
-            if (latest != null && latest != update) notify("새 버전 ${latest.tag}을 설치할 수 있어요")
-            update = latest
             loggedIn = GitHubAuth.token() != null
-            problem = null
+            val limitedUntil =
+                result.limitedUntil ?: runCatching {
+                    val latest = withContext(Dispatchers.IO) { Updater.latestNewer() }
+                    if (latest != null && latest != update) notify("새 버전 ${latest.tag}을 설치할 수 있어요")
+                    update = latest
+                    null
+                }.getOrElse { (it as? GitHubLimitException)?.resetAt ?: throw it }
+            problem = limitedUntil?.let(::limitMessage)
+            // 한도가 풀리기 전에는 다시 확인하지 않는다
+            if (limitedUntil != null) nextScanAt = maxOf(nextScanAt, limitedUntil + 5_000)
             if (isNew && !autoMove) notify("옮길 레포가 ${moves.size}개 있어요")
-        } catch (e: GitHubLimitException) {
-            problem = if (loggedIn) "GitHub 요청 한도를 넘었어요. 잠시 후 다시 확인해요" else "GitHub 요청 한도를 넘었어요. 로그인하면 해결돼요"
         } catch (e: Exception) {
             log("스캔 실패: $e")
             problem = "폴더를 확인하지 못했어요"
         } finally {
             scanning = false
         }
+    }
+
+    private fun limitMessage(resetAt: Long): String {
+        val time = java.time.Instant.ofEpochMilli(resetAt).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+        val at = "%d:%02d".format(time.hour, time.minute)
+        val base = "GitHub 요청 한도를 다 써서 $at 에 다시 확인해요"
+        return if (loggedIn) base else "$base · 로그인하면 한도가 늘어나요"
     }
 
     private suspend fun processMoves() {

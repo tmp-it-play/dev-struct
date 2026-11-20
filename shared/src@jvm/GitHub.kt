@@ -11,6 +11,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Path
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 
 data class GitHubRepo(val id: Long, val ref: RepoRef, val fork: Boolean)
 
@@ -34,13 +35,31 @@ object GitHub {
         return GitHubRepo(json.string("id").toLong(), RepoRef(owner, name), json.string("fork").toBoolean())
     }
 
-    private val etagCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String>>()
+    private val etagCache = ConcurrentHashMap<String, Pair<String, String>>()
+
+    // 비공개(비로그인)·삭제된 레포는 매번 묻지 않는다. 404도 한도를 쓴다
+    private val notFoundUntil = ConcurrentHashMap<String, Long>()
+    private const val NOT_FOUND_TTL = 6 * 60 * 60 * 1000L
+
+    /** 요청 한도가 초기화되는 시각(epoch ms). 그 전에는 요청을 보내지 않는다 */
+    @Volatile var limitedUntil = 0L
+        private set
+
+    /** 로그인/로그아웃하면 볼 수 있는 레포가 달라지므로 기억한 결과를 버린다 */
+    fun clearCache() {
+        etagCache.clear()
+        notFoundUntil.clear()
+        limitedUntil = 0
+    }
 
     /**
-     * 2xx면 JSON, 404 등이면 null. 요청 한도를 넘기면 [GitHubLimitException]을 던진다.
+     * 2xx면 JSON, 404 등이면 null. 요청 한도를 다 쓰면 [GitHubLimitException]을 던진다.
      * 같은 요청은 ETag로 다시 보내 304를 받는다(304는 한도에서 빠지지 않는다).
      */
     fun get(path: String): JsonObject? {
+        val now = System.currentTimeMillis()
+        if (now < limitedUntil) throw GitHubLimitException(limitedUntil)
+        if ((notFoundUntil[path] ?: 0) > now) return null
         val cached = etagCache[path]
         val request =
             HttpRequest
@@ -54,16 +73,19 @@ object GitHub {
             runCatching { http.send(request, HttpResponse.BodyHandlers.ofString()) }.getOrNull() ?: return null
         val status = response.statusCode()
         val header = { name: String -> response.headers().firstValue(name).orElse(null) }
+        val resetAt = header("x-ratelimit-reset")?.toLongOrNull()?.times(1000)
+        val retryAfter = header("retry-after")?.toLongOrNull()?.let { now + it * 1000 }
+        val limited = status == 429 || (status == 403 && (header("x-ratelimit-remaining") == "0" || retryAfter != null))
+        if (limited) {
+            limitedUntil = retryAfter ?: resetAt ?: (now + 60_000)
+            throw GitHubLimitException(limitedUntil)
+        }
         val body =
             when {
                 status == 304 && cached != null -> cached.second
                 status in 200..299 -> response.body().also { b -> header("ETag")?.let { etagCache[path] = it to b } }
-                status == 429 || (
-                    status == 403 && header(
-                        "x-ratelimit-remaining",
-                    ) == "0"
-                    ) -> throw GitHubLimitException()
                 else -> {
+                    if (status == 404) notFoundUntil[path] = now + NOT_FOUND_TTL
                     // 토큰이 폐기됐으면 비로그인으로 돌아간다
                     if (status == 401 && GitHubAuth.token() != null) GitHubAuth.logout()
                     return null
@@ -90,6 +112,6 @@ object GitHub {
     }
 }
 
-class GitHubLimitException : Exception("GitHub 요청 한도를 넘었어요")
+class GitHubLimitException(val resetAt: Long) : Exception("GitHub 요청 한도를 다 썼어요")
 
 fun JsonObject.string(key: String): String = (get(key) as JsonElement?)?.jsonPrimitive?.content.orEmpty()

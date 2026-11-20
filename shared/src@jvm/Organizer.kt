@@ -19,13 +19,26 @@ data class RepoPlan(
     val needsMove get() = !dir.toString().equals(target.toString(), ignoreCase = true)
 }
 
+data class ScanResult(val plans: List<RepoPlan>, val limitedUntil: Long?)
+
 fun targetPath(root: Path, repo: GitHubRepo): Path =
     root.resolve(if (repo.fork) FORK_DIR else repo.ref.owner).resolve(repo.ref.name)
 
 /** root/{owner}/{repo} 구조를 유지한다. remote가 없거나 GitHub가 아닌 레포는 건드리지 않는다. */
 class Organizer(private val root: Path, private val log: (String) -> Unit) {
     /** 부수효과 없이 계획만 만든다. */
-    fun scan(): List<RepoPlan> = repoDirs().mapNotNull(::plan)
+    /** 요청 한도에 걸리면 그때까지 만든 계획과 한도 초기화 시각을 돌려준다. */
+    fun scan(): ScanResult {
+        val plans = mutableListOf<RepoPlan>()
+        for (dir in repoDirs()) {
+            try {
+                plan(dir)?.let(plans::add)
+            } catch (e: GitHubLimitException) {
+                return ScanResult(plans, e.resetAt)
+            }
+        }
+        return ScanResult(plans, null)
+    }
 
     private fun repoDirs(): List<Path> = root
         .listDirectoryEntries()
