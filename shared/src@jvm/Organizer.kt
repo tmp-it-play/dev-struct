@@ -30,7 +30,10 @@ class Organizer(private val root: Path, private val log: (String) -> Unit) {
     private fun repoDirs(): List<Path> = root
         .listDirectoryEntries()
         .filter { it.isDirectory() && !it.name.startsWith(".") }
-        .flatMap { owner -> owner.listDirectoryEntries().filter { it.resolve(".git").isDirectory() } }
+        // 루트 바로 아래에 만든 레포도 remote가 생기면 제자리로 옮긴다
+        .flatMap { dir -> if (dir.isRepo()) listOf(dir) else dir.listDirectoryEntries().filter { it.isRepo() } }
+
+    private fun Path.isRepo() = resolve(".git").isDirectory()
 
     private fun plan(dir: Path): RepoPlan? {
         val remote = git(dir, "remote", "get-url", "origin") ?: return null
