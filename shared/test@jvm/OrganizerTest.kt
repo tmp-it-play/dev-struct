@@ -56,3 +56,14 @@ class OrganizerTest {
         assertEquals(expected, replaceProjectPath(xml, "/h/P/a/foo", "/h/P/b/foo", "/h"))
     }
 }
+
+class UpdaterTest {
+    @Test
+    fun `버전 비교`() {
+        kotlin.test.assertTrue(isNewer("v1.0.1", "1.0.0"))
+        kotlin.test.assertTrue(isNewer("v1.10.0", "1.9.9"))
+        kotlin.test.assertTrue(isNewer("v2", "1.9.9"))
+        kotlin.test.assertFalse(isNewer("v1.0.0", "1.0.0"))
+        kotlin.test.assertFalse(isNewer("v0.9.0", "1.0.0"))
+    }
+}

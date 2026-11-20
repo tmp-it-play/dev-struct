@@ -9,7 +9,8 @@ object Settings {
     private val home = System.getProperty("user.home")
 
     var root: String
-        get() = prefs.get("root", "$home/Programming")
+        // DEVSTRUCT_ROOT로 덮어쓸 수 있다 (테스트용)
+        get() = System.getenv("DEVSTRUCT_ROOT") ?: prefs.get("root", "$home/Programming")
         set(value) = prefs.put("root", value)
 
     var intervalMinutes: Int
@@ -22,23 +23,17 @@ object Settings {
         set(value) = prefs.putBoolean("autoMove", value)
 }
 
-/** 로그인 시 실행. executable-jar로 실행했을 때만 쓸 수 있다. */
+/** 로그인 시 실행. .app 번들로 실행했을 때만 쓸 수 있다. */
 object LoginItem {
     private val plist =
         Path.of(System.getProperty("user.home"), "Library/LaunchAgents/team.themoment.devstruct.plist")
 
-    // `java -jar x.jar`로 실행되면 classpath가 그 jar 하나뿐이다 (`./kotlin run`이면 여러 개라 null)
-    val jarPath: String? =
-        System
-            .getProperty("java.class.path")
-            .takeIf { it.endsWith(".jar") && ':' !in it }
-            ?.let { Path.of(it).toAbsolutePath().toString() }
+    val available get() = Updater.appBundle != null
 
     val enabled get() = Files.exists(plist)
 
     fun enable() {
-        val jar = jarPath ?: return
-        val java = ProcessHandle.current().info().command().orElse("/usr/bin/java")
+        val bundle = Updater.appBundle ?: return
         Files.createDirectories(plist.parent)
         Files.writeString(
             plist,
@@ -49,7 +44,7 @@ object LoginItem {
             <dict>
                 <key>Label</key><string>team.themoment.devstruct</string>
                 <key>ProgramArguments</key>
-                <array><string>$java</string><string>-jar</string><string>$jar</string></array>
+                <array><string>/usr/bin/open</string><string>$bundle</string></array>
                 <key>RunAtLoad</key><true/>
             </dict>
             </plist>

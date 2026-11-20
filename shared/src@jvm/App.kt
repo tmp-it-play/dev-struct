@@ -80,9 +80,9 @@ private fun SettingsSection(app: DevStruct) {
     }
     LabeledSwitch("자동 이동 (끄면 승인한 레포만 이동)", app.autoMove, onChange = app::updateAutoMove)
     LabeledSwitch(
-        if (LoginItem.jarPath == null) "로그인 시 실행 (jar로 실행했을 때만 가능)" else "로그인 시 실행",
+        if (LoginItem.available) "로그인 시 실행" else "로그인 시 실행 (.app으로 실행했을 때만 가능)",
         loginItem,
-        enabled = LoginItem.jarPath != null,
+        enabled = LoginItem.available,
     ) {
         if (it) LoginItem.enable() else LoginItem.disable()
         loginItem = LoginItem.enabled
@@ -93,7 +93,9 @@ private fun SettingsSection(app: DevStruct) {
 private fun StatusSection(app: DevStruct) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Button(enabled = !app.scanning, onClick = app::scanNow) { Text(if (app.scanning) "스캔 중…" else "지금 스캔") }
-        Text("마지막 스캔: ${app.lastScan ?: "-"}")
+        Text("마지막 스캔: ${app.lastScan ?: "-"}", Modifier.weight(1f))
+        Text("v$APP_VERSION")
+        app.update?.let { OutlinedButton(onClick = app::installUpdate) { Text("${it.tag}로 업데이트") } }
     }
     if (app.blockingIdes.isNotEmpty()) {
         Text(

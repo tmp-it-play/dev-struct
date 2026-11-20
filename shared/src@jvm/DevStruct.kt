@@ -30,6 +30,8 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
         private set
     var lastScan by mutableStateOf<String?>(null)
         private set
+    var update by mutableStateOf<Release?>(null)
+        private set
     var autoMove by mutableStateOf(Settings.autoMove)
         private set
     val logs = mutableStateListOf<String>()
@@ -46,6 +48,14 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             processMoves()
             // IDE가 꺼지는 순간을 잡기 위해 대기 중엔 짧게 다시 확인한다
             if (withTimeoutOrNull(30.seconds) { scanRequest.receive() } != null) nextScanAt = 0
+        }
+    }
+
+    fun installUpdate() {
+        val release = update ?: return
+        scope.launch {
+            log("${release.tag} 업데이트를 내려받는 중…")
+            withContext(Dispatchers.IO) { Updater.install(release) }?.let(::log)
         }
     }
 
@@ -80,6 +90,9 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String) 
             approved = approved.filterTo(mutableSetOf()) { dir -> moves.any { it.dir == dir } }
             lastScan = LocalTime.now().format(TIME)
             log("스캔 완료: 레포 ${plans.size}개, 이동 필요 ${moves.size}개")
+            val latest = withContext(Dispatchers.IO) { Updater.latestNewer() }
+            if (latest != null && latest != update) notify("새 버전 ${latest.tag}이 나왔어요")
+            update = latest
             if (isNew && !autoMove) notify("이동 승인이 필요한 레포가 ${moves.size}개 있어요")
         } catch (e: Exception) {
             log("스캔 실패: ${e.message}")
