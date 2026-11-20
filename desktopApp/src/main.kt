@@ -14,6 +14,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.delay
+import java.awt.AlphaComposite
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Desktop
@@ -28,6 +29,9 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
+import java.awt.geom.Area
+import java.awt.geom.Ellipse2D
+import java.awt.geom.Line2D
 import java.awt.geom.RoundRectangle2D
 import java.awt.image.BufferedImage
 import java.nio.file.Path
@@ -166,15 +170,23 @@ private fun popoverLocation(icon: Point?, click: Point?): Point {
     return Point(left.coerceIn(bounds.x + 6, bounds.x + bounds.width - WIDTH - 6), menuBarBottom)
 }
 
-/** 템플릿 이미지(알파만 사용)로 그린 폴더 모양 */
+/** 템플릿 이미지(알파만 사용). 로고처럼 꽉 찬 폴더에 트리 구조를 뚫어 다른 메뉴바 아이콘과 구분되게 한다 */
 private fun trayImage(): BufferedImage {
     val image = BufferedImage(44, 44, BufferedImage.TYPE_INT_ARGB)
     image.createGraphics().apply {
         setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         color = Color.BLACK
-        stroke = BasicStroke(3.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-        fill(RoundRectangle2D.Float(5f, 9f, 15f, 8f, 5f, 5f))
-        draw(RoundRectangle2D.Float(5f, 13f, 34f, 23f, 7f, 7f))
+        val folder = Area(RoundRectangle2D.Float(4f, 8f, 16f, 10f, 5f, 5f))
+        folder.add(Area(RoundRectangle2D.Float(4f, 12f, 36f, 25f, 8f, 8f)))
+        fill(folder)
+        composite = AlphaComposite.Clear
+        stroke = BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+        draw(Line2D.Float(13f, 19f, 13f, 31f))
+        draw(Line2D.Float(13f, 25f, 20f, 25f))
+        draw(Line2D.Float(13f, 31f, 20f, 31f))
+        fill(Ellipse2D.Float(10f, 16f, 6f, 6f))
+        fill(RoundRectangle2D.Float(23f, 22.5f, 11f, 5f, 5f, 5f))
+        fill(RoundRectangle2D.Float(23f, 28.5f, 8f, 5f, 5f, 5f))
         dispose()
     }
     return image
