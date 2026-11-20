@@ -366,7 +366,7 @@ private fun ColumnScope.SettingsTab(app: DevStruct, p: Palette, onClose: () -> U
 }
 
 private const val DEV_TOOLS_INFO =
-    "JetBrains IDE, Android Studio, VS Code, Orca, Paseo, herdr, Air가 켜져 있으면 끌 때까지 기다렸다가 옮기고, " +
+    "JetBrains IDE, Android Studio, VS Code, Cursor, Windsurf, Orca, Paseo, herdr, Air가 켜져 있으면 끌 때까지 기다렸다가 옮기고, " +
         "옮긴 뒤 이 도구들이 기억하는 프로젝트 경로도 바꿔요."
 
 private fun intervalLabel(minutes: Int) = if (minutes < 60) "${minutes}분" else "${minutes / 60}시간"

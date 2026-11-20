@@ -9,7 +9,7 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 /**
- * 프로젝트 경로를 기억하는 개발 도구(JetBrains IDE, Android Studio, VS Code, Orca, Paseo, herdr, JetBrains Air).
+ * 프로젝트 경로를 기억하는 개발 도구(JetBrains IDE, Android Studio, VS Code·Cursor·Windsurf, Orca, Paseo, herdr, JetBrains Air).
  * 대부분 종료할 때 상태를 다시 쓰므로, 실행 중이면 이동을 미루고 모두 꺼진 뒤에만 경로를 바꾼다.
  */
 object DevTools {
@@ -28,6 +28,9 @@ object DevTools {
     private val apps =
         mapOf(
             "Visual Studio Code" to "Code",
+            // VS Code 기반 에디터
+            "Cursor" to null,
+            "Windsurf" to null,
             "Orca" to "Orca",
             // 백그라운드 서버(Paseo Daemon)도 같은 실행 파일이다
             "Paseo" to "Paseo",
@@ -73,7 +76,7 @@ object DevTools {
                     }
                 }
         val vscode =
-            appSupport.resolve("Code/User").let { user ->
+            vscodeUsers().flatMap { user ->
                 listOf(user.resolve("globalStorage/storage.json")) +
                     user.resolve("workspaceStorage").children().map { it.resolve("workspace.json") }
             }
@@ -92,7 +95,7 @@ object DevTools {
     }
 
     private fun sqliteFiles(): List<Path> = (
-        listOf(appSupport.resolve("Code/User/globalStorage/state.vscdb")) +
+        vscodeUsers().map { it.resolve("globalStorage/state.vscdb") } +
             appSupport.resolve("Orca/profiles").children().map { it.resolve("profile-state.db") }
         ).filter { it.isRegularFile() }
 
@@ -133,6 +136,9 @@ object DevTools {
         Files.copy(db, db.resolveSibling("${db.fileName}.devstruct.bak"), REPLACE_EXISTING)
         sql("BEGIN; ${updates.joinToString(" ")} COMMIT;")
     }
+
+    // VS Code와 그 기반 에디터(Cursor, Windsurf)는 설정 구조가 같다
+    private fun vscodeUsers() = listOf("Code", "Cursor", "Windsurf").map { appSupport.resolve("$it/User") }
 
     private fun Path.children(): List<Path> = if (Files.isDirectory(this)) listDirectoryEntries() else emptyList()
 }
