@@ -401,17 +401,21 @@ class DevStruct(private val scope: CoroutineScope, private val notify: (String, 
         if (done.isNotEmpty()) notify("저장소 ${done.size}개를 옮겼어요", Page.Repos)
     }
 
-    private fun log(message: String) {
-        runCatching {
-            // 1MB를 넘으면 이전 로그 한 개만 남긴다
-            if (Files.exists(LOG_FILE) && Files.size(LOG_FILE) > 1_000_000) {
-                Files.move(LOG_FILE, LOG_FILE.resolveSibling("DevStruct.old.log"), StandardCopyOption.REPLACE_EXISTING)
-            }
-            Files.writeString(LOG_FILE, "${LocalDateTime.now()} $message\n", CREATE, APPEND)
-        }
-    }
+    companion object {
+        private val LOG_FILE: Path = Path.of(System.getProperty("user.home"), "Library/Logs/DevStruct.log")
 
-    private companion object {
-        val LOG_FILE: Path = Path.of(System.getProperty("user.home"), "Library/Logs/DevStruct.log")
+        fun log(message: String) {
+            runCatching {
+                // 1MB를 넘으면 이전 로그 한 개만 남긴다
+                if (Files.exists(LOG_FILE) && Files.size(LOG_FILE) > 1_000_000) {
+                    Files.move(
+                        LOG_FILE,
+                        LOG_FILE.resolveSibling("DevStruct.old.log"),
+                        StandardCopyOption.REPLACE_EXISTING,
+                    )
+                }
+                Files.writeString(LOG_FILE, "${LocalDateTime.now()} $message\n", CREATE, APPEND)
+            }
+        }
     }
 }

@@ -60,11 +60,12 @@ object GitHub {
         if (now < limitedUntil) throw GitHubLimitException(limitedUntil)
         if ((notFoundUntil[path] ?: 0) > now) return null
         val cached = etagCache[path]
+        val token = GitHubAuth.token()
         val request =
             HttpRequest
                 .newBuilder(URI.create("https://api.github.com/$path"))
                 .header("Accept", "application/vnd.github+json")
-                .apply { GitHubAuth.token()?.let { header("Authorization", "Bearer $it") } }
+                .apply { token?.let { header("Authorization", "Bearer $it") } }
                 .apply { cached?.let { header("If-None-Match", it.first) } }
                 .timeout(Duration.ofSeconds(20))
                 .build()
@@ -85,8 +86,12 @@ object GitHub {
                 status in 200..299 -> response.body().also { b -> header("ETag")?.let { etagCache[path] = it to b } }
                 else -> {
                     if (status == 404) notFoundUntil[path] = now + NOT_FOUND_TTL
-                    // 토큰이 폐기됐으면 비로그인으로 돌아간다
-                    if (status == 401 && GitHubAuth.token() != null) GitHubAuth.logout()
+                    // 401 한 번으로 키체인 토큰을 지우면 재부팅 때마다 로그인이 풀렸다. 지우지 않고 원인만 남긴다
+                    if (status == 401) {
+                        DevStruct.log(
+                            "GitHub 401: $path (토큰 ${if (token != null) "보냄" else "없음"}) ${response.body().take(200)}",
+                        )
+                    }
                     return null
                 }
             }
